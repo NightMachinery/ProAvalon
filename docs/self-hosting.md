@@ -34,6 +34,10 @@ nvm use VERSION
 
 If you need a proxy for package downloads, export the usual proxy vars before running the script. The script does **not** hardcode them; it just passes through whatever is already present.
 
+Proxy note:
+- the app/pnpm steps inherit your current proxy env vars
+- Docker does **not** inherit those proxy env vars from the script; Docker is run with proxy vars unset so it can use the host's own daemon/mirror configuration (for example `/etc/docker/daemon.json`)
+
 ## Dependency determinism
 
 Self-host installs are pinned by pnpm lock data.

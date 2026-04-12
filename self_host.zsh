@@ -92,6 +92,17 @@ build_proxy_exports() {
   print -r -- "${(F)exports}"
 }
 
+build_docker_env_prefix() {
+  local var
+  local -a prefix=(env)
+
+  for var in "${proxy_vars[@]}"; do
+    prefix+=(-u "$var")
+  done
+
+  print -r -- "${(j: :)${(@q)prefix}}"
+}
+
 normalize_public_url() {
   python3 - "$1" <<'PY'
 import sys
@@ -417,9 +428,9 @@ assert_port_is_free() {
 
 start_infra() {
   note 'Starting MongoDB and MinIO via docker compose'
-  local proxy_exports
-  proxy_exports="$(build_proxy_exports)"
-  local cmd="set -euo pipefail; cd ${(q)ROOT_DIR}; ${proxy_exports:+$proxy_exports; }docker compose -f ${(q)DOCKER_COMPOSE_FILE} up 2>&1 | tee -a ${(q)INFRA_LOG}"
+  local docker_env_prefix
+  docker_env_prefix="$(build_docker_env_prefix)"
+  local cmd="set -euo pipefail; cd ${(q)ROOT_DIR}; ${docker_env_prefix} docker compose -f ${(q)DOCKER_COMPOSE_FILE} up 2>&1 | tee -a ${(q)INFRA_LOG}"
   tmuxnew "$INFRA_SESSION" zsh -lc "$cmd"
   wait_for_tcp 127.0.0.1 "$MONGO_PORT" 'MongoDB'
   wait_for_tcp 127.0.0.1 "$MINIO_PORT" 'MinIO'
@@ -440,7 +451,9 @@ stop_services() {
   tmux kill-session -t "$APP_SESSION" &>/dev/null || true
   tmux kill-session -t "$INFRA_SESSION" &>/dev/null || true
   if [[ -f "$DOCKER_COMPOSE_FILE" ]]; then
-    docker compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true
+    local docker_env_prefix
+    docker_env_prefix="$(build_docker_env_prefix)"
+    eval "$docker_env_prefix docker compose -f ${(q)DOCKER_COMPOSE_FILE} down --remove-orphans >/dev/null 2>&1" || true
   fi
 }
 
