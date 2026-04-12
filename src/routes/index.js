@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import passport from 'passport';
 import sanitizeHtml from 'sanitize-html';
 import mongoose from 'mongoose';
@@ -23,21 +24,39 @@ import { sendResetPassword } from '../myFunctions/sendResetPassword';
 import uuid from 'uuid';
 import { captchaMiddleware } from '../util/captcha';
 import { passwordResetCompletedMetric } from '../metrics/miscellaneousMetrics';
+import {
+  consumeReturnTo,
+  getSavedReturnTo,
+  isSelfHostEnv,
+  normalizeRelativeRedirectPath,
+  stashReturnTo,
+} from '../util/runtime';
 
 const router = new Router();
 
 // Index route
 router.get('/', (req, res) => {
-  res.render('index');
+  const nextPath =
+    normalizeRelativeRedirectPath(req.query.next) || getSavedReturnTo(req) || '';
+  res.render('index', {
+    nextPath,
+    isSelfHost: isSelfHostEnv(),
+  });
 });
 
 // register route
 router.get('/register', (req, res) => {
-  res.render('register', { platform: process.env.ENV });
+  const nextPath =
+    normalizeRelativeRedirectPath(req.query.next) || getSavedReturnTo(req) || '';
+  res.render('register', {
+    platform: process.env.ENV,
+    isSelfHost: isSelfHostEnv(),
+    nextPath,
+  });
 });
 
 const registerLimiter =
-  process.env.ENV === 'local'
+  process.env.ENV === 'local' || isSelfHostEnv()
     ? rateLimit({
         max: 0, // Disable if we are local
       })
@@ -54,41 +73,36 @@ router.post(
   captchaMiddleware,
   sanitiseUsername,
   sanitiseEmail,
+  captureReturnToFromRequest,
   disallowVPNs,
   async (req, res) => {
-    // duplicate code as below
-    const newUser = new User({
-      username: req.body.username,
-      usernameLower: req.body.username.toLowerCase(),
-      dateJoined: new Date(),
-      emailAddress: req.body.emailAddress.toLowerCase(),
-    });
+    const emailAddress = getOptionalEmailAddress(req);
+    const usernameValidationError = getUsernameValidationError(req.body.username);
+    const requiresEmail = !isSelfHostEnv();
 
-    if (req.body.username.indexOf(' ') !== -1) {
-      req.flash(
-        'error',
-        'Sign up failed. Please do not use spaces in your username.',
-      );
+    if (usernameValidationError) {
+      req.flash('error', usernameValidationError);
       res.redirect('register');
-    } else if (req.body.username.length > 25) {
-      req.flash(
-        'error',
-        'Sign up failed. Please do not use more than 25 characters in your username.',
-      );
+    } else if (requiresEmail && !emailAddress) {
+      req.flash('error', 'Please provide an email address.');
       res.redirect('register');
-    } else if (usernameContainsBadCharacter(req.body.username) === true) {
-      req.flash('error', 'Please do not use an illegal character.');
-      res.redirect('register');
-    } else if (validEmail(req.body.emailAddress) === false) {
+    } else if (emailAddress && validEmail(emailAddress) === false) {
       req.flash('error', 'Please provide a valid email address.');
       res.redirect('register');
-    } else if (await emailExists(req.body.emailAddress)) {
-      console.log(req.body.emailAddress);
+    } else if (emailAddress && (await emailExists(emailAddress))) {
+      console.log(emailAddress);
       console.log('In email exists... is true');
       req.flash('error', 'This email address is already in use.');
       res.redirect('register');
     } else {
-      User.register(newUser, req.body.password, (err, user) => {
+      const newUser = new User({
+        username: req.body.username,
+        usernameLower: req.body.username.toLowerCase(),
+        dateJoined: new Date(),
+        emailAddress: emailAddress || undefined,
+      });
+
+      User.register(newUser, req.body.password, async (err, user) => {
         if (err) {
           console.log(`ERROR: ${err}`);
           req.flash(
@@ -97,16 +111,17 @@ router.post(
           );
           res.redirect('register');
         } else {
-          passport.authenticate('local')(req, res, () => {
-            res.redirect('/lobby');
-          });
-          if (process.env.ENV === 'prod') {
-            sendEmailVerification(user, req.body.emailAddress);
+          await logUserIn(req, user);
+
+          if (process.env.ENV === 'prod' && emailAddress) {
+            sendEmailVerification(user, emailAddress);
           } else {
             user.emailVerified = true;
             user.markModified('emailVerified');
-            user.save();
+            await user.save();
           }
+
+          res.redirect(consumeReturnTo(req, '/lobby'));
         }
       });
     }
@@ -114,7 +129,7 @@ router.post(
 );
 
 const loginLimiter =
-  process.env.ENV === 'local'
+  process.env.ENV === 'local' || isSelfHostEnv()
     ? rateLimit({
         max: 0, // Disable if we are local
       })
@@ -128,6 +143,7 @@ router.post(
   '/login',
   loginLimiter,
   sanitiseUsername,
+  captureReturnToFromRequest,
   setCookieDisplayUsername,
   // Ignore disallowing VPNs for login routes due to overuse of the service.
   // disallowVPNs,
@@ -135,6 +151,51 @@ router.post(
     successRedirect: '/loginSuccess',
     failureRedirect: '/loginFail',
   }),
+);
+
+router.post(
+  '/quick-register',
+  registerLimiter,
+  disableRegistrationMiddleware,
+  sanitiseUsername,
+  captureReturnToFromRequest,
+  async (req, res) => {
+    if (!isSelfHostEnv()) {
+      return res.status(404).json({ error: 'Quick registration is unavailable.' });
+    }
+
+    const usernameValidationError = getUsernameValidationError(req.body.username);
+
+    if (usernameValidationError) {
+      return res.status(400).json({ error: usernameValidationError });
+    }
+
+    const generatedPassword = crypto.randomBytes(24).toString('hex');
+    const newUser = new User({
+      username: req.body.username,
+      usernameLower: req.body.username.toLowerCase(),
+      dateJoined: new Date(),
+      authTokenMode: true,
+      emailVerified: true,
+    });
+
+    User.register(newUser, generatedPassword, async (err, user) => {
+      if (err) {
+        console.log(`ERROR: ${err}`);
+        return res.status(400).json({
+          error: 'Sign up failed. Most likely that username is taken.',
+        });
+      }
+
+      await logUserIn(req, user);
+
+      return res.status(200).json({
+        password: generatedPassword,
+        redirectTo: consumeReturnTo(req, '/lobby'),
+        username: user.username,
+      });
+    });
+  },
 );
 
 router.get('/loginSuccess', async (req, res) => {
@@ -155,9 +216,14 @@ router.get('/loginSuccess', async (req, res) => {
 
   req.user.markModified('lastLoggedIn');
 
-  if (req.user.username !== req.cookies['displayUsername']) {
+  const requestedDisplayUsername = req.cookies['displayUsername'];
+
+  if (
+    requestedDisplayUsername &&
+    req.user.username !== requestedDisplayUsername
+  ) {
     if (
-      req.cookies['displayUsername'].toLowerCase() !== req.user.usernameLower
+      requestedDisplayUsername.toLowerCase() !== req.user.usernameLower
     ) {
       req.flash('error', 'Log in failed! Please try again.');
       res.redirect('/');
@@ -167,13 +233,13 @@ router.get('/loginSuccess', async (req, res) => {
       );
     }
 
-    req.user.username = req.cookies['displayUsername'];
+    req.user.username = requestedDisplayUsername;
     req.user.markModified('username');
   }
 
   await req.user.save();
 
-  res.redirect('/lobby');
+  res.redirect(consumeReturnTo(req, '/lobby'));
 });
 
 router.get('/loginFail', (req, res) => {
@@ -238,6 +304,15 @@ router.get('/statistics', (req, res) => {
 });
 
 router.get('/resetPassword', (req, res) => {
+  if (isSelfHostEnv()) {
+    req.flash(
+      'error',
+      'Password reset by email is disabled in self-host mode. Use quick account token management instead.',
+    );
+    res.redirect('/');
+    return;
+  }
+
   res.render('resetPassword', { platform: process.env.ENV });
 });
 
@@ -246,6 +321,15 @@ router.post(
   registerLimiter,
   captchaMiddleware,
   async (req, res) => {
+    if (isSelfHostEnv()) {
+      req.flash(
+        'error',
+        'Password reset by email is disabled in self-host mode. Use quick account token management instead.',
+      );
+      res.redirect('/');
+      return;
+    }
+
     const email = req.body.emailAddress;
     const user = await User.findOne({
       emailAddress: email,
@@ -274,6 +358,15 @@ router.post(
 );
 
 router.get('/resetPassword/verifyResetPassword', async (req, res) => {
+  if (isSelfHostEnv()) {
+    req.flash(
+      'error',
+      'Password reset by email is disabled in self-host mode. Use quick account token management instead.',
+    );
+    res.redirect('/');
+    return;
+  }
+
   if (req.query.token && req.query.token.trim() !== '') {
     const user = await User.findOne({ emailToken: req.query.token });
 
@@ -957,14 +1050,71 @@ function setCookieDisplayUsername(req, res, next) {
 }
 
 function sanitiseEmail(req, res, next) {
+  if (typeof req.body.emailAddress !== 'string') {
+    req.body.emailAddress = '';
+    next();
+    return;
+  }
+
   req.body.emailAddress = sanitizeHtml(req.body.emailAddress, {
     allowedTags: [],
     allowedAttributes: [],
   });
 
-  req.body.emailAddress = req.body.emailAddress.toLowerCase();
+  req.body.emailAddress = req.body.emailAddress.toLowerCase().trim();
 
   next();
+}
+
+function captureReturnToFromRequest(req, res, next) {
+  const requestedPath =
+    normalizeRelativeRedirectPath(req.body.next) ||
+    normalizeRelativeRedirectPath(req.query.next);
+
+  if (requestedPath) {
+    stashReturnTo(req, requestedPath);
+  }
+
+  next();
+}
+
+function getOptionalEmailAddress(req) {
+  return typeof req.body.emailAddress === 'string'
+    ? req.body.emailAddress.toLowerCase().trim()
+    : '';
+}
+
+function getUsernameValidationError(username) {
+  if (typeof username !== 'string' || username.trim() === '') {
+    return 'Sign up failed. Please provide a username.';
+  }
+
+  if (username.indexOf(' ') !== -1) {
+    return 'Sign up failed. Please do not use spaces in your username.';
+  }
+
+  if (username.length > 25) {
+    return 'Sign up failed. Please do not use more than 25 characters in your username.';
+  }
+
+  if (usernameContainsBadCharacter(username) === true) {
+    return 'Please do not use an illegal character.';
+  }
+
+  return null;
+}
+
+function logUserIn(req, user) {
+  return new Promise((resolve, reject) => {
+    req.logIn(user, (err) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+
+      resolve();
+    });
+  });
 }
 
 function disableRegistrationMiddleware(req, res, next) {

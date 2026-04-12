@@ -1,8 +1,9 @@
 import { RequestHandler } from 'express';
 import axios from 'axios';
+import { isProdEnv } from './runtime';
 
 export const captchaMiddleware: RequestHandler = async (req, res, next) => {
-  if (process.env.ENV !== 'prod') {
+  if (!isProdEnv()) {
     return next();
   }
 

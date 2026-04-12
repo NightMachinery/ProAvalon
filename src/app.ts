@@ -47,7 +47,8 @@ const assetsPath = path.join(__dirname, '../assets');
 if (
   process.env.ENV !== 'local' &&
   process.env.ENV !== 'staging' &&
-  process.env.ENV !== 'prod'
+  process.env.ENV !== 'prod' &&
+  process.env.ENV !== 'selfhost'
 ) {
   console.error('Bad environment variable given.');
   process.exit(1);

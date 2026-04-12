@@ -38,6 +38,7 @@ import { JoinQueueFilter } from './filters/joinQueueFilter';
 import { Role } from '../gameplay/gameEngine/roles/types';
 import { Phase } from '../gameplay/gameEngine/phases/types';
 import { Card } from '../gameplay/gameEngine/cards/types';
+import { isSelfHostEnv } from '../util/runtime';
 import { TOCommandsImported } from './commands/tournamentOrganisers';
 import { uniqueLoginsMetric } from '../metrics/miscellaneousMetrics';
 
@@ -1656,7 +1657,7 @@ function joinQueue(): boolean {
     return false;
   }
 
-  if (process.env.ENV !== 'local') {
+  if (process.env.ENV !== 'local' && !isSelfHostEnv()) {
     if (this.request.user.totalGamesPlayed < 3) {
       this.emit('allChatToClient', {
         message: 'You require 3 games to join the ranked queue.',

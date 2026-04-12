@@ -5,6 +5,7 @@
 
 <link href="/libraries/summernote-0.8.9-dist/dist/summernote.css" rel="stylesheet">
 <script src="/libraries/summernote-0.8.9-dist/dist/summernote.js"></script>
+<script src="<%-getVersionedPath('/scripts/devicePassword.js')%>"></script>
 
 
 <style>
@@ -27,6 +28,38 @@
 
     <br>
 
+    <% if (userData.authTokenMode) { %>
+    <div class="well" id="devicePasswordPanel" data-username="<%=userData.username%>">
+        <h3>Quick-login token</h3>
+        <p>
+            This account uses a device-saved login token. Keep a copy if you want to log in on another device.
+        </p>
+
+        <div class="form-group">
+            <label for="devicePasswordValue">Saved token</label>
+            <input
+                id="devicePasswordValue"
+                class="form-control"
+                type="password"
+                readonly
+                placeholder="No token saved on this device yet"
+            >
+        </div>
+
+        <div class="form-group" style="margin-top: 10px;">
+            <button type="button" class="btn btn-default" id="toggleDevicePasswordButton">Show token</button>
+            <button type="button" class="btn btn-info" id="copyDevicePasswordButton">Copy token</button>
+            <button type="button" class="btn btn-warning" id="rotateDevicePasswordButton">Rotate token</button>
+            <button type="button" class="btn btn-danger" id="forgetDevicePasswordButton">Forget on this device</button>
+        </div>
+
+        <p id="devicePasswordStatus" class="text-muted">
+            The token is stored only in this browser's localStorage.
+        </p>
+    </div>
+    <% } %>
+
+    <% if (shouldShowPatreon) { %>
     <h3>Linked Patreon Details</h3>
     <% if (patronDetails) { %>
         <ul>
@@ -43,6 +76,7 @@
 
         <br>
         <a id="linkPatreonButton" class="btn btn-warning">Link to Patreon</a>
+    <% } %>
     <% } %>
 
     <br>
@@ -417,6 +451,7 @@
         $("#flagSpan").addClass("flag-icon-" + countryCode.toLowerCase());
     }
 
+    <% if (shouldShowPatreon) { %>
     $('#linkPatreonButton').on('click', async () => {
         const currentUrl = window.location.href ;
 
@@ -474,6 +509,102 @@
 
 
     });
+    <% } %>
+
+    <% if (userData.authTokenMode) { %>
+    setupDevicePasswordPanel();
+    <% } %>
+
+    function setupDevicePasswordPanel() {
+        const helpers = window.ProAvalonDevicePassword;
+        const username = $('#devicePasswordPanel').data('username');
+        const passwordInput = $('#devicePasswordValue');
+        const status = $('#devicePasswordStatus');
+        let visible = false;
+
+        function renderPassword() {
+            const record = helpers.getQuickAuth(username);
+            passwordInput.val(record ? record.password : '');
+            passwordInput.attr('type', visible ? 'text' : 'password');
+            $('#toggleDevicePasswordButton').text(visible ? 'Hide token' : 'Show token');
+
+            if (record) {
+                status.text(`Token last saved on this device at ${new Date(record.updatedAt).toLocaleString()}.`);
+            } else {
+                status.text('No token is currently saved on this device. You can rotate it to create and save a new one.');
+            }
+        }
+
+        $('#toggleDevicePasswordButton').on('click', function () {
+            visible = !visible;
+            renderPassword();
+        });
+
+        $('#copyDevicePasswordButton').on('click', function () {
+            const record = helpers.getQuickAuth(username);
+
+            if (!record) {
+                Swal.fire({
+                    title: 'No saved token on this device.',
+                    type: 'warning',
+                });
+                return;
+            }
+
+            const copied = helpers.copyTextHttpSafe(record.password);
+            Swal.fire({
+                title: copied ? 'Token copied.' : 'Copy failed.',
+                type: copied ? 'success' : 'error',
+            });
+        });
+
+        $('#forgetDevicePasswordButton').on('click', function () {
+            helpers.forgetQuickAuth(username);
+            visible = false;
+            renderPassword();
+            Swal.fire({
+                title: 'Forgot the saved token on this device.',
+                type: 'success',
+            });
+        });
+
+        $('#rotateDevicePasswordButton').on('click', async function () {
+            const confirmed = await Swal.fire({
+                title: 'Rotate your quick-login token?',
+                text: 'Old copies of the token will stop working.',
+                type: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Rotate token',
+                cancelButtonText: 'Cancel',
+            });
+
+            if (!confirmed.value) {
+                return;
+            }
+
+            try {
+                const response = await axios({
+                    method: 'POST',
+                    url: `/profile/<%=userData.username%>/device-password/rotate`,
+                });
+
+                helpers.saveQuickAuth(username, response.data.password);
+                visible = true;
+                renderPassword();
+                Swal.fire({
+                    title: 'Quick-login token rotated.',
+                    type: 'success',
+                });
+            } catch (err) {
+                Swal.fire({
+                    title: (err && err.response && err.response.data) || 'Unable to rotate token.',
+                    type: 'error',
+                });
+            }
+        });
+
+        renderPassword();
+    }
 
 </script>
 

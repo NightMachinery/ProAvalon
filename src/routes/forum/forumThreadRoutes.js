@@ -8,6 +8,7 @@ import forumThread from '../../models/forumThread';
 import { allowedHtmlTags, allowedHtmlAttributes } from './sanitizeRestrictions';
 import REWARDS from '../../rewards/constants';
 import { userHasReward } from '../../rewards/getRewards';
+import { isSelfHostEnv } from '../../util/runtime';
 
 // Prevent too many requests
 const router = new Router();
@@ -128,7 +129,7 @@ lastIds.findOne({}).exec(async (err, returnedLastId) => {
 });
 
 const newForumLimiter =
-  process.env.ENV === 'local'
+  process.env.ENV === 'local' || isSelfHostEnv()
     ? rateLimit({
         max: 0, // Disable if we are local
       })

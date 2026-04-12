@@ -22,6 +22,10 @@ const UserSchema = new mongoose.Schema<IUser>({
     type: Boolean,
     default: false,
   },
+  authTokenMode: {
+    type: Boolean,
+    default: false,
+  },
   // I've decided it is ok to not have these email tokens expire.
   emailToken: String,
   emailTokenExpiry: Date,

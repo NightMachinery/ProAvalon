@@ -14,9 +14,10 @@ import { acreateseason } from './acreateseason';
 import { agetcurrentseason } from './agetcurrentseason';
 import { agetstat, aupdatestat } from './acreatestat';
 import { atogglecreateroom } from './atogglecreateroom';
+import { isSelfHostEnv } from '../../../util/runtime';
 
 const debugCommands =
-  process.env.ENV === 'local'
+  process.env.ENV === 'local' || isSelfHostEnv()
     ? {
         [acreateseason.command]: acreateseason,
         [agetcurrentseason.command]: agetcurrentseason,

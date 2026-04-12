@@ -1,135 +1,287 @@
 <%- include('partials/header'); %>
 
-<link rel="stylesheet" type="text/css" href="/stylesheets/index.css" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.18.1/moment.min.js"></script>
+<% if (isSelfHost) { %>
+<script src="<%-getVersionedPath('/scripts/devicePassword.js')%>"></script>
+<% } %>
 
 <style>
-  body {
-    // background-image: url("/pictures/0c42a04b087d6faaea1b410fbb0c4198_original.jpg");
-    // background-repeat: no-repeat;
-    // background-attachment: fixed;
-    // background-size: cover;
-
-    // filter: brightness(50%);
+  .landing-shell {
+    margin: 20px auto;
+    max-width: 1100px;
   }
 
-  .jumbotron {
-    border-radius: 5px;
-    // padding-top: 0px;
+  .landing-panel {
+    background: #f7f7f7;
+    border: 2px solid #b5b5b5;
+    border-radius: 4px;
+    box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
+    margin-bottom: 20px;
+    padding: 24px;
   }
 
-  #scrollDiv {
-    // filter: brightness(75%);
+  .landing-actions .btn {
+    margin-right: 8px;
+    margin-bottom: 8px;
   }
 
-  .myContainer {
-    padding-right: 15px;
-    padding-left: 15px;
-    margin-right: auto;
-    margin-left: auto;
-    width: 90%;
+  #rememberedAccountPanel {
+    display: none;
   }
 
-  #scroll {
-    position: absolute;
-    transform: translateX(-50%);
-    z-index: -1;
+  #rememberedTokenValue {
+    margin-top: 10px;
+  }
+
+  .hero-logo {
+    display: block;
+    margin: 0 auto 20px;
+    max-width: 100%;
   }
 </style>
 
-<div class="myContainer">
+<div class="landing-shell">
   <div class="row">
-    <div id="scrollDiv" class="col-md-5" style="height: 500px">
-      <img src="/pictures/scroll-min.png" id="scroll" />
-
-      <form id="form" action="/login" method="POST">
-        <h3 id="loginHeading">Log in!</h3>
-        <div class="form-group">
-          <label for="username">Username: </label>
-          <input
-            type="username"
-            class="form-control"
-            id="username"
-            placeholder="Username"
-            name="username"
-          />
-        </div>
-        <div class="form-group">
-          <label for="password">Password: </label>
-          <input
-            type="password"
-            class="form-control"
-            id="password"
-            placeholder="Password"
-            ,
-            name="password"
-          />
-        </div>
-        <button type="submit" class="btn btn-default">Play</button>
-
-        <a href="/register" class="btn btn-default pull-right">Register</a>
-        <div>
-          <a href="/resetPassword" class="pull-right" style=""
-          >Forgot password?</a
-          >
-        </div>
-      </form>
-    </div>
-
-    <div class="col-md-7 jumbotron">
-      <div>
-        <img
-          id="imgBigLogo"
-          src="/pictures/logo-min.png"
-          style="width: 100%; text-align: center"
-        />
-      </div>
-
-      <h1>A game of deception</h1>
-      <p id="testId">Can you outwit your opponents?</p>
-
-      <div class="hero-unit">
-        <p></p>
-        <p style="font-size: 18px">
-          This is a free online version of the popular game
-          <a
-            href="http://www.amazon.com/Indie-Boards-Cards-RES2IBC-Resistance/dp/B008A2BA8G"
-            ><em>The Resistance</em></a
-          >
-          (designed by Don Eskridge), wherein a small band of revolutionaries
-          must use logic and deduction in order to ferret out the spies who have
-          infiltrated their ranks and are sabotaging the cell's presumably
-          heroic acts of rebellion against government tyranny.
+    <div class="col-md-5">
+      <div class="landing-panel">
+        <% if (isSelfHost) { %>
+        <h2>Quick start</h2>
+        <p>
+          Enter a name and start playing immediately. We will create a quick-login token for this device and you can reveal it later to sign in elsewhere.
         </p>
 
-        <br />
-        <a style="font-size: 18px" href="/community"
-          >See our community page for regular players!</a
-        >
+        <form id="quickRegisterForm">
+          <input type="hidden" name="next" value="<%= nextPath || '' %>">
+          <div class="form-group">
+            <label for="quickUsername">Display name</label>
+            <input
+              type="text"
+              class="form-control"
+              id="quickUsername"
+              name="username"
+              maxlength="25"
+              placeholder="Choose a name"
+              required
+            />
+          </div>
 
-        <br />
-        <a style="font-size: 18px" href="https://discord.gg/3mHdKNT"
-        >Join our Discord too!</a
-        >
+          <button type="submit" class="btn btn-primary btn-block" id="quickRegisterSubmitButton">
+            Create account and play
+          </button>
+        </form>
+
+        <hr>
+
+        <div id="rememberedAccountPanel">
+          <h3>Saved on this device</h3>
+          <p>
+            Continue as <strong id="rememberedAccountName"></strong>
+          </p>
+
+          <input
+            id="rememberedTokenValue"
+            class="form-control"
+            type="password"
+            readonly
+            placeholder="Saved token"
+          />
+
+          <div class="landing-actions" style="margin-top: 10px;">
+            <button type="button" class="btn btn-success" id="continueRememberedButton">Continue as saved user</button>
+            <button type="button" class="btn btn-default" id="toggleRememberedTokenButton">Show token</button>
+            <button type="button" class="btn btn-info" id="copyRememberedTokenButton">Copy token</button>
+            <button type="button" class="btn btn-danger" id="forgetRememberedTokenButton">Forget on this device</button>
+          </div>
+        </div>
+
+        <hr>
+
+        <div class="landing-actions">
+          <button
+            type="button"
+            class="btn btn-default"
+            data-toggle="collapse"
+            data-target="#legacyLoginPanel"
+            aria-expanded="false"
+            aria-controls="legacyLoginPanel"
+          >
+            Log in with existing password
+          </button>
+          <a href="/register<%= nextPath ? '?next=' + encodeURIComponent(nextPath) : '' %>" class="btn btn-default">
+            Sign up with the old form
+          </a>
+        </div>
+
+        <div class="collapse" id="legacyLoginPanel" style="margin-top: 15px;">
+          <form id="legacyLoginForm" action="/login" method="POST">
+            <input type="hidden" name="next" value="<%= nextPath || '' %>">
+            <div class="form-group">
+              <label for="legacyUsername">Username</label>
+              <input type="text" class="form-control" id="legacyUsername" name="username" placeholder="Username" />
+            </div>
+            <div class="form-group">
+              <label for="legacyPassword">Password</label>
+              <input type="password" class="form-control" id="legacyPassword" name="password" placeholder="Password" />
+            </div>
+            <button type="submit" class="btn btn-default">Log in</button>
+          </form>
+        </div>
+        <% } else { %>
+        <form id="legacyLoginForm" action="/login" method="POST">
+          <input type="hidden" name="next" value="<%= nextPath || '' %>">
+          <h2>Log in</h2>
+          <div class="form-group">
+            <label for="legacyUsername">Username</label>
+            <input type="text" class="form-control" id="legacyUsername" name="username" placeholder="Username" />
+          </div>
+          <div class="form-group">
+            <label for="legacyPassword">Password</label>
+            <input type="password" class="form-control" id="legacyPassword" name="password" placeholder="Password" />
+          </div>
+          <button type="submit" class="btn btn-default">Play</button>
+          <a href="/register<%= nextPath ? '?next=' + encodeURIComponent(nextPath) : '' %>" class="btn btn-default pull-right">Register</a>
+          <div>
+            <a href="/resetPassword" class="pull-right">Forgot password?</a>
+          </div>
+        </form>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="col-md-7">
+      <div class="landing-panel jumbotron">
+        <img class="hero-logo" src="/pictures/logo-min.png" alt="ProAvalon logo" />
+
+        <h1>A game of deception</h1>
+        <p>Can you outwit your opponents?</p>
+        <p style="font-size: 18px;">
+          This is a free online version of <em>The Resistance</em>, where a small band of revolutionaries must use logic and deduction to identify the spies hiding among them.
+        </p>
+        <% if (isSelfHost) { %>
+        <p style="font-size: 18px;">
+          New here? The quick start flow on the left is the fastest way in. If you already have a username and password, use the legacy login option instead.
+        </p>
+        <% } %>
+        <p style="font-size: 18px;">
+          <a href="/community">See our community page for regular players.</a>
+        </p>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-  if ($('#imgBigLogo').width() < 560) {
-    $($('#vid1')[0]).width($('#imgBigLogo').width());
+  <% if (isSelfHost) { %>
+  const helpers = window.ProAvalonDevicePassword;
+  const rememberedPanel = $('#rememberedAccountPanel');
+  const rememberedName = $('#rememberedAccountName');
+  const rememberedTokenValue = $('#rememberedTokenValue');
+  let rememberedVisible = false;
+
+  function getRememberedRecord() {
+    return helpers.getLastQuickAuth();
   }
 
-  $(document).ready(function () {
-    setupPageStuff();
-    setInterval(function () {
-      setupPageStuff();
-      // console.log("a");
-    }, 1000);
+  function renderRememberedAccount() {
+    const record = getRememberedRecord();
 
-    // If we have a ban alert, convert the timestamp from millis to local time.
-    var banAlertBox = $(".alert-danger[role='alert']")[0];
+    if (!record) {
+      rememberedPanel.hide();
+      rememberedTokenValue.val('');
+      rememberedVisible = false;
+      return;
+    }
+
+    rememberedName.text(record.username);
+    rememberedTokenValue.val(record.password);
+    rememberedTokenValue.attr('type', rememberedVisible ? 'text' : 'password');
+    $('#toggleRememberedTokenButton').text(rememberedVisible ? 'Hide token' : 'Show token');
+    rememberedPanel.show();
+  }
+
+  function submitRememberedLogin() {
+    const record = getRememberedRecord();
+
+    if (!record) {
+      renderRememberedAccount();
+      return;
+    }
+
+    $('#legacyUsername').val(record.username);
+    $('#legacyPassword').val(record.password);
+    $('#legacyLoginForm').trigger('submit');
+  }
+  <% } %>
+
+  $(document).ready(function () {
+    <% if (isSelfHost) { %>
+    renderRememberedAccount();
+
+    $('#quickRegisterForm').on('submit', async function (event) {
+      event.preventDefault();
+
+      const submitButton = $('#quickRegisterSubmitButton');
+      submitButton.prop('disabled', true).text('Creating account...');
+
+      try {
+        const response = await $.ajax({
+          method: 'POST',
+          url: '/quick-register',
+          data: $(this).serialize(),
+        });
+
+        helpers.saveQuickAuth(response.username, response.password);
+        window.location.href = response.redirectTo || '/lobby';
+      } catch (error) {
+        Swal.fire({
+          title: (error && error.responseJSON && error.responseJSON.error) || 'Unable to create your account.',
+          type: 'error',
+        });
+      } finally {
+        submitButton.prop('disabled', false).text('Create account and play');
+      }
+    });
+
+    $('#continueRememberedButton').on('click', function () {
+      submitRememberedLogin();
+    });
+
+    $('#toggleRememberedTokenButton').on('click', function () {
+      rememberedVisible = !rememberedVisible;
+      renderRememberedAccount();
+    });
+
+    $('#copyRememberedTokenButton').on('click', function () {
+      const record = getRememberedRecord();
+
+      if (!record) {
+        renderRememberedAccount();
+        return;
+      }
+
+      const copied = helpers.copyTextHttpSafe(record.password);
+      Swal.fire({
+        title: copied ? 'Token copied.' : 'Copy failed.',
+        type: copied ? 'success' : 'error',
+      });
+    });
+
+    $('#forgetRememberedTokenButton').on('click', function () {
+      const record = getRememberedRecord();
+      if (!record) {
+        renderRememberedAccount();
+        return;
+      }
+
+      helpers.forgetQuickAuth(record.username);
+      renderRememberedAccount();
+      Swal.fire({
+        title: 'Forgot the saved token on this device.',
+        type: 'success',
+      });
+    });
+    <% } %>
+
+    var banAlertBox = $('.alert-danger[role="alert"]')[0];
 
     if (banAlertBox) {
       var timeStampStr = banAlertBox.innerText;
@@ -140,10 +292,7 @@
           timeStampStr.lastIndexOf('*')
         );
 
-        // console.log(subStr);
-        // console.log(moment(subStr, "x").format("LLL"));
-
-        var localBanExpire = moment(subStr, 'x').format('LLL');
+        var localBanExpire = new Date(parseInt(subStr, 10)).toLocaleString();
 
         var firstHalf = timeStampStr.substring(
           0,
@@ -155,44 +304,11 @@
           timeStampStr.length
         );
 
-        // console.log(firstHalf + localBanExpire + secondHalf);
-        if (localBanExpire != 'Invalid date') {
+        if (localBanExpire != 'Invalid Date') {
           banAlertBox.innerText = firstHalf + localBanExpire + secondHalf;
         }
       }
     }
-  });
-
-  function setupPageStuff() {
-    var scaleWidDownForm = 0.6;
-    $('#form').width($('#scroll').width() * scaleWidDownForm + 'px');
-
-    var leftPosOfScroll;
-    if ($('#scroll').css('left') === 'auto') {
-      leftPosOfScroll = ($($('#form').parent()).width() * 1.07) / 2;
-    } else {
-      leftPosOfScroll = parseInt($('#scroll').css('left'), 10);
-    }
-    var offset = $('#scroll').width() / 2;
-
-    var leftPosToScroll = leftPosOfScroll - offset;
-
-    var distToCenter =
-      (parseInt($('#scroll').width(), 10) - parseInt($('#form').width(), 10)) /
-      2;
-
-    $('#form').css('left', leftPosToScroll + distToCenter + 'px');
-    // $("#form").css("left", (leftPosToScroll + distToCenter) + "px");
-    $('#form').css('top', $('#scroll').height() * 0.2 + 'px');
-
-    // $("#testId")[0].innerText = $("#form").parent();
-    // console.log($($("#form").parent()).find("#scroll"));
-
-    $('#scrollDiv').height($('#scroll').height());
-  }
-
-  $(window).resize(function () {
-    setupPageStuff();
   });
 </script>
 

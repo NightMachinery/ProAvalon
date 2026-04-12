@@ -1,4 +1,4 @@
-const VALID_ENVIRONMENTS = ['local', 'staging', 'prod'];
+const VALID_ENVIRONMENTS = ['local', 'staging', 'prod', 'selfhost'];
 if (!VALID_ENVIRONMENTS.includes(process.env.ENV)) {
   throw new Error(`Invalid settings: ENV=${process.env.ENV}`);
 }

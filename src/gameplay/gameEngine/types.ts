@@ -40,6 +40,7 @@ export interface IUser {
   password?: string;
   emailAddress?: string;
   emailVerified?: boolean;
+  authTokenMode?: boolean;
   emailToken?: string;
   emailTokenExpiry?: Date;
   avatarImgRes?: string | null;

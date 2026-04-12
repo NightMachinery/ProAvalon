@@ -22,6 +22,7 @@ export default class S3Controller implements IS3Controller {
       region: process.env.S3_REGION,
       endpoint: process.env.S3_ENDPOINT,
       credentials: fromEnv(),
+      forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
     });
   }
 

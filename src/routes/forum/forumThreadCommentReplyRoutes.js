@@ -12,6 +12,7 @@ import {
 import { createNotification } from '../../myFunctions/createNotification';
 import REWARDS from '../../rewards/constants';
 import { userHasReward } from '../../rewards/getRewards';
+import { isSelfHostEnv } from '../../util/runtime';
 
 const router = new Router();
 
@@ -38,7 +39,7 @@ const sanitizeHtmlAllowedAttributesForumThread = {
 };
 
 const newReplyLimiter =
-  process.env.ENV === 'local'
+  process.env.ENV === 'local' || isSelfHostEnv()
     ? rateLimit({
         max: 0, // Disable if we are local
       })

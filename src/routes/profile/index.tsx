@@ -2,6 +2,7 @@
 import express from 'express';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
+import crypto from 'crypto';
 import imageSize from 'image-size';
 import multer from 'multer';
 import sanitizeHtml from 'sanitize-html';
@@ -27,6 +28,7 @@ import { getAndUpdatePatreonRewardTierForUser } from '../../rewards/getRewards';
 import dbAdapter from '../../databaseAdapters';
 import { getAvatarLibrarySizeForUser } from '../../rewards/getRewards';
 import { avatarSubmissionsMetric } from '../../metrics/miscellaneousMetrics';
+import { isSelfHostEnv } from '../../util/runtime';
 
 const MAX_ACTIVE_AVATAR_REQUESTS = 1;
 const MIN_GAMES_REQUIRED = 100;
@@ -627,6 +629,7 @@ router.get(
         } else {
           res.render('profile/changepassword', {
             username: foundUser.username,
+            authTokenMode: Boolean(foundUser.authTokenMode),
           });
         }
       },
@@ -678,14 +681,48 @@ router.post(
   },
 );
 
+router.post(
+  '/:profileUsername/device-password/rotate',
+  checkProfileOwnership,
+  async (req, res) => {
+    const theUser = req.user;
+
+    if (!theUser.authTokenMode) {
+      return res.status(400).send('This account does not use quick-login mode.');
+    }
+
+    const newPassword = crypto.randomBytes(24).toString('hex');
+
+    await new Promise((resolve, reject) => {
+      theUser.setPassword(newPassword, (err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+
+        resolve(null);
+      });
+    });
+
+    theUser.authTokenMode = true;
+    theUser.markModified('authTokenMode');
+    await theUser.save();
+
+    return res.status(200).send({ password: newPassword });
+  },
+);
+
 // show the edit page
 router.get(
   '/:profileUsername/edit',
   checkProfileOwnership,
   async (req, res) => {
-    const patronDetails = await patreonAgent.findOrUpdateExistingPatronDetails(
-      req.params.profileUsername.toLowerCase(),
-    );
+    const shouldShowPatreon = !isSelfHostEnv();
+    const patronDetails = shouldShowPatreon
+      ? await patreonAgent.findOrUpdateExistingPatronDetails(
+          req.params.profileUsername.toLowerCase(),
+        )
+      : null;
 
     const userData = await User.findOne({
       usernameLower: req.params.profileUsername.toLowerCase(),
@@ -694,6 +731,8 @@ router.get(
     return res.render('profile/edit', {
       userData,
       patronDetails,
+      shouldShowPatreon,
+      isSelfHost: isSelfHostEnv(),
     });
   },
 );

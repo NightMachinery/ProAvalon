@@ -6,6 +6,7 @@ import User from '../models/user';
 import Ban from '../models/ban';
 import { isMod } from '../modsadmins/mods';
 import { isAdmin } from '../modsadmins/admins';
+import { stashReturnTo } from '../util/runtime';
 
 import { RequestHandler } from 'express';
 
@@ -26,8 +27,9 @@ export const asyncMiddleware =
 export const isLoggedIn = asyncMiddleware(async (req, res, next) => {
   // Check if the user is logged in.
   if (!req.isAuthenticated()) {
+    stashReturnTo(req, req.originalUrl);
     req.flash('error', 'Please log in to view this page.');
-    res.redirect('/');
+    res.redirect(`/?next=${encodeURIComponent(req.originalUrl)}`);
     return;
   }
 
