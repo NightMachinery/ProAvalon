@@ -340,9 +340,34 @@ run_in_node_shell() {
   zsh -lc "set -euo pipefail; cd ${(q)ROOT_DIR}; ${proxy_exports:+$proxy_exports; }export COREPACK_ENABLE_STRICT=0; source ~/.shared.sh >/dev/null 2>&1 || true; nvm-load >/dev/null 2>&1; nvm use ${(q)NODE_VERSION} >/dev/null; ${command_string}"
 }
 
+repo_uses_yarn() {
+  python3 - "$ROOT_DIR/package.json" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], 'r', encoding='utf-8') as handle:
+        package_json = json.load(handle)
+except Exception:
+    print('false')
+    raise SystemExit(0)
+
+package_manager = str(package_json.get('packageManager') or '')
+print('true' if package_manager.startswith('yarn@') else 'false')
+PY
+}
+
 install_dependencies() {
   note 'Installing dependencies with pnpm'
-  if [[ ! -f "$ROOT_DIR/pnpm-lock.yaml" ]]; then
+  local uses_yarn
+  uses_yarn="$(repo_uses_yarn)"
+
+  if [[ "$uses_yarn" == 'true' && -f "$ROOT_DIR/yarn.lock" ]]; then
+    if [[ ! -f "$ROOT_DIR/pnpm-lock.yaml" || "$ROOT_DIR/package.json" -nt "$ROOT_DIR/pnpm-lock.yaml" || "$ROOT_DIR/yarn.lock" -nt "$ROOT_DIR/pnpm-lock.yaml" ]]; then
+      note 'Refreshing pnpm-lock.yaml from yarn.lock'
+      run_in_node_shell 'pnpm import'
+    fi
+  elif [[ ! -f "$ROOT_DIR/pnpm-lock.yaml" ]]; then
     [[ -f "$ROOT_DIR/yarn.lock" ]] || die 'Missing pnpm-lock.yaml and yarn.lock. Cannot perform a deterministic install.'
     note 'Generating pnpm-lock.yaml from yarn.lock'
     run_in_node_shell 'pnpm import'
@@ -356,29 +381,59 @@ build_app() {
   run_in_node_shell 'pnpm run build'
 }
 
+port_is_ready() {
+  local host="$1"
+  local port="$2"
+  python3 - "$host" "$port" <<'PY'
+import socket
+import sys
+
+host, port = sys.argv[1], int(sys.argv[2])
+with socket.socket() as sock:
+    sock.settimeout(1)
+    try:
+        sock.connect((host, port))
+    except OSError:
+        raise SystemExit(1)
+raise SystemExit(0)
+PY
+}
+
+print_log_tail() {
+  local log_file="$1"
+  local lines="${2:-80}"
+
+  [[ -f "$log_file" ]] || return 0
+
+  print -- "---- Last ${lines} lines of ${log_file#$ROOT_DIR/} ----"
+  tail -n "$lines" "$log_file"
+  print -- '---- End log tail ----'
+}
+
 wait_for_tcp() {
   local host="$1"
   local port="$2"
   local label="$3"
-  python3 - "$host" "$port" "$label" <<'PY'
-import socket
-import sys
-import time
+  local session_name="${4:-}"
+  local log_file="${5:-}"
+  local deadline="$((SECONDS + 90))"
 
-host, port, label = sys.argv[1], int(sys.argv[2]), sys.argv[3]
-deadline = time.time() + 90
-while time.time() < deadline:
-    with socket.socket() as sock:
-        sock.settimeout(1)
-        try:
-            sock.connect((host, port))
-        except OSError:
-            time.sleep(1)
-            continue
-    print(f'{label} is ready on {host}:{port}')
-    raise SystemExit(0)
-raise SystemExit(f'Timed out waiting for {label} on {host}:{port}')
-PY
+  while (( SECONDS < deadline )); do
+    if port_is_ready "$host" "$port"; then
+      print -- "${label} is ready on ${host}:${port}"
+      return 0
+    fi
+
+    if [[ -n "$session_name" ]] && ! tmux has-session -t "$session_name" &>/dev/null; then
+      [[ -n "$log_file" ]] && print_log_tail "$log_file"
+      die "${label} exited before binding to ${host}:${port}"
+    fi
+
+    sleep 1
+  done
+
+  [[ -n "$log_file" ]] && print_log_tail "$log_file"
+  die "Timed out waiting for ${label} on ${host}:${port}"
 }
 
 configure_minio_bucket() {
@@ -504,7 +559,7 @@ start_app() {
   proxy_exports="$(build_proxy_exports)"
   local cmd="set -euo pipefail; ${proxy_exports:+$proxy_exports; }exec ${(q)RUN_APP_SCRIPT}"
   tmuxnew "$APP_SESSION" zsh -lc "$cmd"
-  wait_for_tcp 127.0.0.1 "$APP_PORT" 'ProAvalon app'
+  wait_for_tcp 127.0.0.1 "$APP_PORT" 'ProAvalon app' "$APP_SESSION" "$APP_LOG"
 }
 
 stop_services() {
