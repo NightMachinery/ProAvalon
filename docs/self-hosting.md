@@ -10,6 +10,7 @@ The self-host flow:
 - keeps both under **tmux**
 - writes a managed ProAvalon block into `~/Caddyfile`
 - proxies uploaded assets through the same public origin, so browsers only need the site URL
+- installs dependencies deterministically with pnpm, using `pnpm-lock.yaml` when present and otherwise importing one from `yarn.lock`
 
 Default public URL:
 - `http://avalon.pinky.lilf.ir`
@@ -33,6 +34,15 @@ nvm use VERSION
 
 If you need a proxy for package downloads, export the usual proxy vars before running the script. The script does **not** hardcode them; it just passes through whatever is already present.
 
+## Dependency determinism
+
+Self-host installs are pinned by pnpm lock data.
+
+That means:
+- `setup` / `redeploy` use `pnpm install --frozen-lockfile`
+- if `pnpm-lock.yaml` is missing, the script first runs `pnpm import` from the repo's committed `yarn.lock`
+- dependency resolution stays tied to checked-in lock data instead of drifting to newer semver matches
+
 ## Commands
 
 From the repo root:
@@ -48,7 +58,7 @@ From the repo root:
 `setup` always does:
 1. stop existing ProAvalon self-host services
 2. choose/persist runtime config
-3. install dependencies with `pnpm`
+3. install dependencies with `pnpm --frozen-lockfile` (importing from `yarn.lock` first if needed)
 4. build the app
 5. update `~/Caddyfile`
 6. start MongoDB + MinIO + the app

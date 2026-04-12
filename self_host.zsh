@@ -270,7 +270,13 @@ run_in_node_shell() {
 
 install_dependencies() {
   note 'Installing dependencies with pnpm'
-  run_in_node_shell 'pnpm install --prefer-offline --reporter append-only --network-concurrency 1 --fetch-retries 20 --fetch-retry-factor 2 --fetch-retry-mintimeout 2000 --fetch-retry-maxtimeout 120000'
+  if [[ ! -f "$ROOT_DIR/pnpm-lock.yaml" ]]; then
+    [[ -f "$ROOT_DIR/yarn.lock" ]] || die 'Missing pnpm-lock.yaml and yarn.lock. Cannot perform a deterministic install.'
+    note 'Generating pnpm-lock.yaml from yarn.lock'
+    run_in_node_shell 'pnpm import'
+  fi
+
+  run_in_node_shell 'pnpm install --frozen-lockfile --prefer-offline --reporter append-only --network-concurrency 1 --fetch-retries 20 --fetch-retry-factor 2 --fetch-retry-mintimeout 2000 --fetch-retry-maxtimeout 120000'
 }
 
 build_app() {
