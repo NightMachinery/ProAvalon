@@ -7,12 +7,18 @@ export function generateLabelCombinations(
     // Get current label options
     const options = Array.from(labelOptions[labelName]);
 
-    labelCombinations = labelCombinations.flatMap((combination) =>
-      options.map((option) => ({
-        ...combination,
-        [labelName]: option,
-      })),
-    );
+    const nextLabelCombinations: Record<string, string>[] = [];
+
+    labelCombinations.forEach((combination: Record<string, string>) => {
+      options.forEach((option) => {
+        nextLabelCombinations.push({
+          ...combination,
+          [labelName]: option,
+        });
+      });
+    });
+
+    labelCombinations = nextLabelCombinations;
   });
 
   return labelCombinations;

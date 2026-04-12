@@ -10,7 +10,7 @@ import {
 import { IS3Controller } from './S3Agent';
 
 export default class S3Controller implements IS3Controller {
-  private client: S3Client;
+  private client: any;
   private publicFileLinkPrefix: string;
   private bucket: string;
 
@@ -58,7 +58,7 @@ export default class S3Controller implements IS3Controller {
       const s3Objects = await this.client.send(command);
 
       if (s3Objects.KeyCount !== 0) {
-        s3Objects.Contents.forEach((object) => {
+        s3Objects.Contents.forEach((object: any) => {
           keys.push(object.Key);
         });
       }

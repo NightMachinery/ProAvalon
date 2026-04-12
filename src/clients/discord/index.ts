@@ -21,9 +21,11 @@ export function sendToDiscordMods(message: string, ping?: boolean): void {
 }
 
 function sendToChannel(message: string, channelId: string): void {
-  const channel = client.channels.cache.get(channelId) as TextChannel;
+  const channel = (client.channels.cache as any).get(channelId) as
+    | TextChannel
+    | undefined;
 
-  if (process.env.ENV === 'prod') {
+  if (process.env.ENV === 'prod' && channel) {
     channel.send(message);
   }
 }
