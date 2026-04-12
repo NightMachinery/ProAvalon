@@ -19,6 +19,7 @@ DEFAULT_MONGO_PORT="${SELF_HOST_MONGO_PORT:-27017}"
 DEFAULT_MINIO_PORT="${SELF_HOST_MINIO_PORT:-9000}"
 MONGO_IMAGE="${SELF_HOST_MONGO_IMAGE:-mongo:7}"
 MINIO_IMAGE="${SELF_HOST_MINIO_IMAGE:-minio/minio:latest}"
+DOCKER_DAEMON_JSON="${SELF_HOST_DOCKER_DAEMON_JSON:-/etc/docker/daemon.json}"
 APP_SESSION="proavalon-selfhost-app"
 INFRA_SESSION="proavalon-selfhost-infra"
 CADDY_BEGIN="# BEGIN ProAvalon self-host"
@@ -101,6 +102,62 @@ build_docker_env_prefix() {
   done
 
   print -r -- "${(j: :)${(@q)prefix}}"
+}
+
+get_configured_registry_mirror() {
+  local configured_mirror="${SELF_HOST_REGISTRY_MIRROR:-}"
+
+  if [[ -n "$configured_mirror" ]]; then
+    print -r -- "$configured_mirror"
+    return
+  fi
+
+  [[ -f "$DOCKER_DAEMON_JSON" ]] || return 0
+
+  python3 - "$DOCKER_DAEMON_JSON" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+
+try:
+    with open(path, 'r', encoding='utf-8') as handle:
+        data = json.load(handle)
+except Exception:
+    raise SystemExit(0)
+
+mirrors = data.get('registry-mirrors') or []
+if mirrors:
+    print(str(mirrors[0]).rstrip('/'))
+PY
+}
+
+resolve_docker_image_ref() {
+  local image_ref="$1"
+  local mirror
+  mirror="$(get_configured_registry_mirror)"
+
+  if [[ -z "$mirror" ]]; then
+    print -r -- "$image_ref"
+    return
+  fi
+
+  local mirror_without_scheme="${mirror#http://}"
+  mirror_without_scheme="${mirror_without_scheme#https://}"
+  mirror_without_scheme="${mirror_without_scheme%/}"
+
+  local image_name="${image_ref%%:*}"
+  local image_tag=""
+  if [[ "$image_ref" == *:* ]]; then
+    image_tag=":${image_ref##*:}"
+  fi
+
+  local image_path="$image_ref"
+  if [[ "$image_name" != */* ]]; then
+    image_path="library/${image_ref}"
+  fi
+
+  print -r -- "${mirror_without_scheme}/${image_path}"
 }
 
 normalize_public_url() {
@@ -208,10 +265,14 @@ load_config() {
 }
 
 write_docker_compose_file() {
+  local mongo_image_ref minio_image_ref
+  mongo_image_ref="$(resolve_docker_image_ref "$MONGO_IMAGE")"
+  minio_image_ref="$(resolve_docker_image_ref "$MINIO_IMAGE")"
+
   cat > "$DOCKER_COMPOSE_FILE" <<EOF_COMPOSE
 services:
   mongo:
-    image: ${MONGO_IMAGE}
+    image: ${mongo_image_ref}
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
@@ -222,7 +283,7 @@ services:
       - ${STATE_DIR}/data/mongodb:/data/db
 
   minio:
-    image: ${MINIO_IMAGE}
+    image: ${minio_image_ref}
     restart: unless-stopped
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
