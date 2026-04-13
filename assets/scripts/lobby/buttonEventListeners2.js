@@ -138,6 +138,15 @@ document.querySelector('#backButton').addEventListener('click', () => {
   leaveRoom();
 });
 
+let copyRoomLinkFeedbackTimeout;
+
+function setCopyRoomLinkButtonState(text, className) {
+  const copyButton = document.querySelector('#copyRoomLinkButton');
+  copyButton.innerText = text;
+  copyButton.classList.remove('btn-info', 'btn-success', 'btn-danger');
+  copyButton.classList.add(className);
+}
+
 document.querySelector('#copyRoomLinkButton').addEventListener('click', () => {
   if (!roomId) {
     return;
@@ -146,10 +155,13 @@ document.querySelector('#copyRoomLinkButton').addEventListener('click', () => {
   const copied = copyTextHttpSafe(
     `${window.location.origin}/lobby?roomId=${roomId}`,
   );
-  Swal.fire({
-    title: copied ? 'Room link copied.' : 'Copy failed.',
-    type: copied ? 'success' : 'error',
-  });
+
+  clearTimeout(copyRoomLinkFeedbackTimeout);
+  setCopyRoomLinkButtonState(copied ? 'Copied!' : 'Copy failed', copied ? 'btn-success' : 'btn-danger');
+
+  copyRoomLinkFeedbackTimeout = window.setTimeout(() => {
+    setCopyRoomLinkButtonState('Copy link', 'btn-info');
+  }, 1500);
 });
 
 document.querySelector('#restartRoomButton').addEventListener('click', async () => {
