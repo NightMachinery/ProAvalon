@@ -88,4 +88,5 @@ export type RoomPlayer = {
   avatarImgSpy: string;
   avatarHide: boolean;
   claim: boolean;
+  disconnected?: boolean;
 };

@@ -59,6 +59,7 @@ async function greenButtonFunction() {
         assassination: ((parseInt($('#startGameOptionsAssassinationPhaseTimeoutMin').val()) * 60 + parseInt($('#startGameOptionsAssassinationPhaseTimeoutSec').val())) * 1000).toString(),
       },
       anonymousMode: $('#startGameOptionsAnonymousMode')[0].checked,
+      revealExactSpyRolesToSpies: $('#startGameOptionsRevealExactSpyRolesToSpies')[0].checked,
     };
     socket.emit('startGame', startGameData);
   } else if (await confirmUserClick('yes')) {
@@ -137,6 +138,45 @@ document.querySelector('#backButton').addEventListener('click', () => {
   leaveRoom();
 });
 
+document.querySelector('#copyRoomLinkButton').addEventListener('click', () => {
+  if (!roomId) {
+    return;
+  }
+
+  const copied = copyTextHttpSafe(
+    `${window.location.origin}/lobby?roomId=${roomId}`,
+  );
+  Swal.fire({
+    title: copied ? 'Room link copied.' : 'Copy failed.',
+    type: copied ? 'success' : 'error',
+  });
+});
+
+document.querySelector('#restartRoomButton').addEventListener('click', async () => {
+  if (document.querySelector('#restartRoomButton').classList.contains('hidden')) {
+    return;
+  }
+
+  let title = 'Restart lobby?';
+  let text = 'This will return the room to the waiting lobby with the same players and settings.';
+  if (gameData && gameData.phase !== 'Finished' && gameData.phase !== 'Voided') {
+    title = 'Cancel current game?';
+    text = 'This will cancel the current game and return everyone to the waiting lobby.';
+  }
+
+  const result = await Swal.fire({
+    title,
+    text,
+    type: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Restart lobby',
+  });
+
+  if (result.value) {
+    socket.emit('restart-room');
+  }
+});
+
 function leaveRoom() {
   changeView();
   socket.emit('leave-room', '');
@@ -149,6 +189,7 @@ function joinRoom(roomId_) {
   socket.emit('join-room', roomId_);
   // change the view to the room instead of lobby
   roomId = roomId_;
+  setRoomUrl(roomId_);
   // set the spectator to true
   isSpectator = true;
   // change to the game room view
@@ -176,6 +217,7 @@ $('#newRoom').on('click', (data) => {
   $('#newRoomPassword').val('');
   // 10p default
   $('.maxNumPlayers').val('10');
+  $('.listedInLobby')[1].checked = true;
 
   // $(".gun").css("visibility", "hidden");
 
@@ -194,6 +236,7 @@ $('#createNewRoomButton').on('click', (data) => {
     gameMode: $($('.gameModeSelect')[1]).val(),
     muteSpectators: $('.muteSpectators')[1].checked,
     disableVoteHistory: $('.disableVoteHistory')[1].checked,
+    listedInLobby: $('.listedInLobby')[1].checked,
     ranked: $($('.rankedSelect')[1]).val(),
   };
 
@@ -202,6 +245,7 @@ $('#createNewRoomButton').on('click', (data) => {
   $($('.gameModeSelect')[0]).val(sendObj.gameMode);
   $('.muteSpectators')[0].checked = sendObj.muteSpectators;
   $('.disableVoteHistory')[0].checked = sendObj.disableVoteHistory;
+  $('.listedInLobby')[0].checked = sendObj.listedInLobby;
   $($('.rankedSelect')[0]).val(sendObj.ranked);
 
   socket.emit('newRoom', sendObj);

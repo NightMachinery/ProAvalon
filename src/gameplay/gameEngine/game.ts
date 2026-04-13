@@ -124,6 +124,8 @@ class Game extends Room {
 
   anonymizer: Anonymizer = new Anonymizer();
   anonymousMode = false;
+  revealExactSpyRolesToSpies = false;
+  restartPlayerSeats = [];
 
   recoverableComponents: IRecoverable[] = [];
 
@@ -177,6 +179,14 @@ class Game extends Room {
   configureAnonymousMode(anonymousMode: boolean): void {
     if (this.gameStarted === false) {
       this.anonymousMode = anonymousMode;
+    }
+  }
+
+  configureRevealExactSpyRolesToSpies(
+    revealExactSpyRolesToSpies: boolean,
+  ): void {
+    if (this.gameStarted === false) {
+      this.revealExactSpyRolesToSpies = revealExactSpyRolesToSpies;
     }
   }
 
@@ -262,13 +272,31 @@ class Game extends Room {
 
   playerJoinRoom(socket, inputPassword) {
     if (this.gameStarted === true) {
+      let rejoinSeatIndex = -1;
+      let previousSeat;
+      let replacedExistingSeat = false;
+
       // if the new socket is a player, add them to the sockets of players
       for (let i = 0; i < this.playersInGame.length; i++) {
         if (
           this.playersInGame[i].username.toLowerCase() ===
           socket.request.user.username.toLowerCase()
         ) {
-          this.socketsOfPlayers.splice(i, 0, socket);
+          rejoinSeatIndex = i;
+          if (
+            this.socketsOfPlayers[i] &&
+            this.socketsOfPlayers[i].request &&
+            this.socketsOfPlayers[i].request.user &&
+            this.socketsOfPlayers[i].request.user.username &&
+            this.socketsOfPlayers[i].request.user.username.toLowerCase() ===
+              socket.request.user.username.toLowerCase()
+          ) {
+            previousSeat = this.socketsOfPlayers[i];
+            this.socketsOfPlayers[i] = socket;
+            replacedExistingSeat = true;
+          } else {
+            this.socketsOfPlayers.splice(i, 0, socket);
+          }
 
           const prevUsername = this.playersInGame[i].username;
           this.playersInGame[i].request = socket.request;
@@ -297,9 +325,13 @@ class Game extends Room {
 
       // If the player failed the join, remove their socket.
       if (resultOfRoomJoin === false) {
-        const index = this.socketsOfPlayers.indexOf(socket);
-        if (index !== -1) {
-          this.socketsOfPlayers.splice(index, 1);
+        if (replacedExistingSeat === true && rejoinSeatIndex !== -1) {
+          this.socketsOfPlayers[rejoinSeatIndex] = previousSeat;
+        } else {
+          const index = this.socketsOfPlayers.indexOf(socket);
+          if (index !== -1) {
+            this.socketsOfPlayers.splice(index, 1);
+          }
         }
       }
 
@@ -360,6 +392,15 @@ class Game extends Room {
     }
   }
 
+  playerDisconnectRoom(socket) {
+    if (this.gameStarted === true) {
+      this.playerLeaveRoom(socket);
+      return;
+    }
+
+    Room.prototype.playerDisconnectRoom.call(this, socket);
+  }
+
   static checkOptions(options: string[]): {
     success: boolean;
     errMessage: string;
@@ -390,6 +431,9 @@ class Game extends Room {
       return false;
     }
     this.startGameTime = new Date();
+    this.restartPlayerSeats = this.socketsOfPlayers.map((seat) =>
+      this.createReservedSeat(seat),
+    );
 
     // make game started after the checks for game already started
     this.gameStarted = true;
@@ -1026,7 +1070,10 @@ class Game extends Room {
           this.playersInGame[i].username,
         );
         // need to go through all sockets, but only send to the socket of players in game
-        if (this.socketsOfPlayers[index]) {
+        if (
+          this.socketsOfPlayers[index] &&
+          typeof this.socketsOfPlayers[index].emit === 'function'
+        ) {
           this.socketsOfPlayers[index].emit('game-data', gameData[i]);
           // console.log("Sent to player: " + this.playersInGame[i].request.user.username + " role " + gameData[i].role);
         }
@@ -2188,6 +2235,39 @@ class Game extends Room {
         'server-text',
       );
     }
+  }
+
+  getVisibleSpySeeData(): {
+    spies: string[];
+    roleTags: Record<string, string>;
+  } {
+    const spies = [];
+    const roleTags: Record<string, string> = {};
+
+    if (this.gameStarted !== true) {
+      return { spies, roleTags };
+    }
+
+    for (const player of this.playersInGame) {
+      if (player.alliance !== Alliance.Spy) {
+        continue;
+      }
+
+      if (player.role === Role.Oberon) {
+        continue;
+      }
+
+      const anonUsername = this.anonymizer.anon(player.username);
+      spies.push(anonUsername);
+
+      if (this.revealExactSpyRolesToSpies) {
+        roleTags[anonUsername] = player.role;
+      } else if (player.role === Role.Hitberon) {
+        roleTags[anonUsername] = Role.Hitberon;
+      }
+    }
+
+    return { spies, roleTags };
   }
 
   /*

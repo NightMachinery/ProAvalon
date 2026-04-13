@@ -23,6 +23,7 @@ export class RoomConfig {
   gameMode: GameMode;
   ranked: boolean;
   readyPrompt: ReadyPrompt;
+  listedInLobby: boolean;
 
   constructor(
     host: string,
@@ -33,6 +34,7 @@ export class RoomConfig {
     gameMode: GameMode,
     ranked: boolean,
     readyPrompt: ReadyPrompt,
+    listedInLobby = true,
   ) {
     this.host = host;
     this.roomId = roomId;
@@ -42,6 +44,7 @@ export class RoomConfig {
     this.gameMode = gameMode;
     this.ranked = ranked;
     this.readyPrompt = readyPrompt;
+    this.listedInLobby = listedInLobby !== false;
   }
 
   boundMaxNumPlayers(num: number) {
@@ -70,6 +73,7 @@ class Room {
   joinPassword: string;
   gameMode: GameMode;
   ranked: boolean;
+  listedInLobby: boolean;
 
   allSockets: SocketUser[];
   socketsOfPlayers: SocketUser[];
@@ -90,6 +94,7 @@ class Room {
     this.gameMode = roomConfig.gameMode;
     this.ranked = roomConfig.ranked;
     this.readyPrompt = roomConfig.readyPrompt;
+    this.listedInLobby = roomConfig.listedInLobby !== false;
 
     this.gamesRequiredForRanked = 0;
     this.provisionalGamesRequired = 20;
@@ -107,6 +112,67 @@ class Room {
     this.specialRoles = this.initialiseGameDependencies(avalonRoles);
     this.specialPhases = this.initialiseGameDependencies(avalonPhases);
     this.specialCards = this.initialiseGameDependencies(avalonCards);
+  }
+
+  findSeatIndexByUsername(username: string): number {
+    for (let i = 0; i < this.socketsOfPlayers.length; i++) {
+      const roomSocket = this.socketsOfPlayers[i];
+      if (
+        roomSocket &&
+        roomSocket.request &&
+        roomSocket.request.user &&
+        roomSocket.request.user.username &&
+        roomSocket.request.user.username.toLowerCase() === username.toLowerCase()
+      ) {
+        return i;
+      }
+    }
+
+    return -1;
+  }
+
+  createReservedSeat(socket: SocketUser) {
+    return {
+      request: socket.request,
+      isBotSocket: socket.isBotSocket === true,
+      reservedSeat: true,
+      disconnected: true,
+      handleGameStart: socket.handleGameStart,
+      handleGameOver: socket.handleGameOver,
+      handleRequestAction: socket.handleRequestAction,
+    };
+  }
+
+  getConnectedPlayerCount(): number {
+    let count = 0;
+
+    for (const seat of this.socketsOfPlayers) {
+      if (seat && typeof seat.emit === 'function') {
+        count++;
+      }
+    }
+
+    return count;
+  }
+
+  getRoomInfo() {
+    const timeouts = this.gameTimer
+      ? this.gameTimer.getTimeouts()
+      : { default: 0, critMission: 0, assassination: 0 };
+
+    return {
+      maxNumPlayers: this.maxNumPlayers,
+      gameMode: this.gameMode,
+      ranked: this.ranked ? 'ranked' : 'unranked',
+      muteSpectators: Boolean(this.muteSpectators),
+      disableVoteHistory: Boolean(this.disableVoteHistory),
+      listedInLobby: this.listedInLobby !== false,
+      startSettings: {
+        anonymousMode: Boolean(this.anonymousMode),
+        revealExactSpyRolesToSpies: Boolean(this.revealExactSpyRolesToSpies),
+        timeouts,
+      },
+    };
   }
 
   playerJoinRoom(socket, inputPassword) {
@@ -152,6 +218,18 @@ class Room {
     }
 
     this.allSockets.push(socket);
+
+    const reservedSeatIndex = this.findSeatIndexByUsername(
+      socket.request.user.username,
+    );
+    if (
+      this.gameStarted !== true &&
+      reservedSeatIndex !== -1 &&
+      this.socketsOfPlayers[reservedSeatIndex] &&
+      this.socketsOfPlayers[reservedSeatIndex].reservedSeat === true
+    ) {
+      this.socketsOfPlayers[reservedSeatIndex] = socket;
+    }
 
     this.updateRoomPlayers();
 
@@ -217,7 +295,12 @@ class Room {
       return;
     }
     // If they already exist, no need to add
-    if (this.socketsOfPlayers.indexOf(socket) !== -1) {
+    const existingSeatIndex = this.findSeatIndexByUsername(socketUsername);
+    if (existingSeatIndex !== -1) {
+      if (this.socketsOfPlayers[existingSeatIndex] !== socket) {
+        this.socketsOfPlayers[existingSeatIndex] = socket;
+        this.updateRoomPlayers();
+      }
       return;
     }
 
@@ -233,12 +316,35 @@ class Room {
     }
 
     // Grab their index
-    const index = this.socketsOfPlayers.indexOf(socket);
+    const index = this.findSeatIndexByUsername(socket.request.user.username);
     // If they are on the list of sockets of players,
     if (index !== -1) {
       this.socketsOfPlayers.splice(index, 1);
       this.updateRoomPlayers();
     }
+  }
+
+  playerDisconnectRoom(socket) {
+    const seatIndex = this.findSeatIndexByUsername(socket.request.user.username);
+    if (seatIndex !== -1) {
+      this.socketsOfPlayers[seatIndex] = this.createReservedSeat(socket);
+    }
+
+    const index = this.allSockets.indexOf(socket);
+    if (index !== -1) {
+      this.allSockets.splice(index, 1);
+    }
+
+    if (
+      this.allSockets.length === 0 &&
+      this.socketsOfPlayers.length === 0 &&
+      this.phase !== Phase.Frozen
+    ) {
+      console.log(`Room: ${this.roomId} is empty, attempting to destroy...`);
+      this.destroyRoom = true;
+    }
+
+    this.updateRoomPlayers();
   }
 
   playerLeaveRoom(socket) {
@@ -260,7 +366,8 @@ class Room {
 
       if (
         this.gameMode.toLowerCase().includes('bot') === true &&
-        oldHost !== this.host
+        oldHost !== this.host &&
+        typeof newHostSocket.emit === 'function'
       ) {
         const data = {
           message:
@@ -275,7 +382,11 @@ class Room {
     }
 
     // Destroy room if there's no one in it anymore
-    if (this.allSockets.length === 0 && this.phase !== Phase.Frozen) {
+    if (
+      this.allSockets.length === 0 &&
+      this.socketsOfPlayers.length === 0 &&
+      this.phase !== Phase.Frozen
+    ) {
       console.log(`Room: ${this.roomId} is empty, attempting to destroy...`);
       this.destroyRoom = true;
     }
@@ -283,7 +394,11 @@ class Room {
     this.updateRoomPlayers();
 
     // If the new host is a bot... leave the room.
-    if (newHostSocket !== undefined && newHostSocket.isBotSocket === true) {
+    if (
+      newHostSocket !== undefined &&
+      newHostSocket.isBotSocket === true &&
+      typeof newHostSocket.emit === 'function'
+    ) {
       this.playerLeaveRoom(newHostSocket);
     }
   }
@@ -297,14 +412,16 @@ class Room {
           socketOfTarget = this.allSockets[i];
         }
       }
-      if (socketOfTarget === null) {
+      const seatIndex = this.findSeatIndexByUsername(username);
+      if (socketOfTarget === null && seatIndex === -1) {
         return;
       }
 
-      // Make them stand up forcefully
-      this.playerStandUp(socketOfTarget);
+      if (seatIndex !== -1) {
+        this.socketsOfPlayers.splice(seatIndex, 1);
+      }
 
-      if (socketOfTarget.isBotSocket) {
+      if (socketOfTarget && socketOfTarget.isBotSocket) {
         this.playerLeaveRoom(socketOfTarget);
       }
 
@@ -376,7 +493,8 @@ class Room {
         tmpSocket.emit('update-room-players', this.getRoomPlayers());
         tmpSocket.emit('update-room-spectators', usernamesOfSpecs);
         tmpSocket.emit('update-room-info', {
-          maxNumPlayers: this.maxNumPlayers,
+          ...this.getRoomInfo(),
+          isHost: tmpSocket.request.user.username === this.host,
         });
       }
     }
@@ -396,6 +514,7 @@ class Room {
         avatarImgSpy: this.socketsOfPlayers[i].request.user.avatarImgSpy,
         avatarHide: this.socketsOfPlayers[i].request.user.avatarHide,
         claim: isClaiming,
+        disconnected: this.socketsOfPlayers[i].reservedSeat === true,
       };
 
       // give the host the teamLeader star
@@ -437,6 +556,15 @@ class Room {
       this.maxNumPlayers = number;
       this.updateRoomPlayers();
     }
+  }
+
+  updateListedInLobby(socket, listedInLobby: boolean) {
+    if (socket.request.user.username !== this.host) {
+      return;
+    }
+
+    this.listedInLobby = listedInLobby !== false;
+    this.updateRoomPlayers();
   }
 
   updateRanked(socket, rankedType) {
@@ -603,13 +731,22 @@ class Room {
     gameMode: string,
     timeouts: Timeouts,
     anonymousMode: boolean,
+    revealExactSpyRolesToSpies: boolean,
   ) {
+    const hostSocket = this.allSockets.find(
+      (sock) => sock.request.user.username === this.host,
+    );
+
     if (this.gameStarted === true) {
       return false;
     }
 
+    if (!hostSocket) {
+      return false;
+    }
+
     if (this.socketsOfPlayers.length < MIN_PLAYERS) {
-      this.socketsOfPlayers[0].emit(
+      hostSocket.emit(
         'danger-alert',
         'Minimum 5 players to start. ',
       );
@@ -618,7 +755,7 @@ class Room {
 
     const checkOptions = Game.checkOptions(options);
     if (!checkOptions.success) {
-      this.socketsOfPlayers[0].emit('danger-alert', checkOptions.errMessage);
+      hostSocket.emit('danger-alert', checkOptions.errMessage);
       return false;
     }
 
@@ -651,6 +788,7 @@ class Room {
       timeouts.assassination,
     )}`;
     rolesInStr += `<br>Anonymous mode: ${anonymousMode}`;
+    rolesInStr += `<br>Reveal exact evil roles: ${revealExactSpyRolesToSpies}`;
 
     this.sendText('The game is starting!', 'gameplay-text');
 
@@ -659,7 +797,7 @@ class Room {
     });
 
     this.readyPrompt.createReadyPrompt(
-      this.socketsOfPlayers,
+      [hostSocket],
       'Game starting!',
       rolesInStr,
       (
@@ -674,8 +812,8 @@ class Room {
             sock.emit('spec-game-starting-finished', null);
           });
 
-          for (const rejectedUsername of rejectedUsernames) {
-            this.sendText(`${rejectedUsername} is not ready.`, 'server-text');
+          if (rejectedUsernames.length > 0) {
+            this.sendText(`${rejectedUsernames[0]} cancelled the start.`, 'server-text');
           }
 
           this.lockJoin = false;

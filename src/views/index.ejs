@@ -87,6 +87,7 @@
 
           <div class="landing-actions" style="margin-top: 10px;">
             <button type="button" class="btn btn-success" id="continueRememberedButton">Continue as saved user</button>
+            <button type="button" class="btn btn-default" id="skipAutoLoginButton">Use another account</button>
             <button type="button" class="btn btn-default" id="toggleRememberedTokenButton">Show token</button>
             <button type="button" class="btn btn-info" id="copyRememberedTokenButton">Copy token</button>
             <button type="button" class="btn btn-danger" id="forgetRememberedTokenButton">Forget on this device</button>
@@ -175,10 +176,19 @@
   const rememberedPanel = $('#rememberedAccountPanel');
   const rememberedName = $('#rememberedAccountName');
   const rememberedTokenValue = $('#rememberedTokenValue');
+  const AUTO_LOGIN_DISABLED_KEY = 'proavalon.quickAuth.autoLoginDisabled';
   let rememberedVisible = false;
 
   function getRememberedRecord() {
     return helpers.getLastQuickAuth();
+  }
+
+  function setAutoLoginDisabled(disabled) {
+    window.localStorage.setItem(AUTO_LOGIN_DISABLED_KEY, disabled ? 'true' : 'false');
+  }
+
+  function isAutoLoginDisabled() {
+    return window.localStorage.getItem(AUTO_LOGIN_DISABLED_KEY) === 'true';
   }
 
   function renderRememberedAccount() {
@@ -206,6 +216,7 @@
       return;
     }
 
+    setAutoLoginDisabled(false);
     $('#legacyUsername').val(record.username);
     $('#legacyPassword').val(record.password);
     $('#legacyLoginForm').trigger('submit');
@@ -215,6 +226,12 @@
   $(document).ready(function () {
     <% if (isSelfHost) { %>
     renderRememberedAccount();
+    const hasPageError = $('.alert-danger[role="alert"]').length > 0;
+    const rememberedRecord = getRememberedRecord();
+    if (rememberedRecord && !isAutoLoginDisabled() && !hasPageError) {
+      submitRememberedLogin();
+      return;
+    }
 
     $('#quickRegisterForm').on('submit', async function (event) {
       event.preventDefault();
@@ -243,6 +260,15 @@
 
     $('#continueRememberedButton').on('click', function () {
       submitRememberedLogin();
+    });
+
+    $('#skipAutoLoginButton').on('click', function () {
+      setAutoLoginDisabled(true);
+      renderRememberedAccount();
+      Swal.fire({
+        title: 'Auto-login disabled for this browser.',
+        type: 'success',
+      });
     });
 
     $('#toggleRememberedTokenButton').on('click', function () {

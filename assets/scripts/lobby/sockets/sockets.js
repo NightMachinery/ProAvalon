@@ -21,6 +21,8 @@ socket.on('joinedGameSuccess', (data) => {
 let intervalId = 0;
 let attemptNumber = 0;
 const MAX_NUM_TRIES = 5;
+const initialRoomIdFromUrl = getRoomIdFromUrl();
+let initialRoomJoinAttempted = false;
 
 function stopReconnectInterval() {
   if (intervalId) {
@@ -41,6 +43,12 @@ socket.on('connect', () => {
     const roomIdCopy = roomId;
     leaveRoom();
     joinRoom(roomIdCopy);
+  } else if (
+    initialRoomJoinAttempted === false &&
+    initialRoomIdFromUrl !== undefined
+  ) {
+    initialRoomJoinAttempted = true;
+    joinRoom(initialRoomIdFromUrl);
   }
 
   if (!firstTimeConnected) {
@@ -462,6 +470,7 @@ socket.on('auto-join-room-id', (roomId_, newRoomPassword) => {
   socket.emit('join-game', roomId_);
   isSpectator = false;
   roomId = roomId_;
+  setRoomUrl(roomId_);
   // change the view to the room instead of lobby
   changeView();
 });
@@ -476,8 +485,13 @@ socket.on('match-found-join-room', (data) => {
 
   roomId = data.roomId;
   isSpectator = false;
+  setRoomUrl(data.roomId);
 
   changeView();
+});
+
+socket.on('room-reset-to-waiting', () => {
+  resetGameToWaitingLobby();
 });
 
 socket.on('update-status-message', (data) => {
@@ -648,10 +662,14 @@ socket.on('joinPassword', (roomId) => {
 });
 
 socket.on('changeView', (targetLocation) => {
+  if (targetLocation === 'lobby') {
+    setLobbyUrl();
+  }
   changeView();
 });
 
 socket.on('wrongRoomPassword', () => {
+  setLobbyUrl();
   swal({
     title: 'Incorrect password',
     type: 'warning',
@@ -661,15 +679,56 @@ socket.on('wrongRoomPassword', () => {
 
 // this part at the moment only updates the max number of players in a game.
 socket.on('update-room-info', (data) => {
+  roomInfoData = data;
   // data.maxNumPlayers
   $(
     '.gameInfoMaxPlayers'
-  )[0].innerText = `${roomPlayersData.length}/${data.maxNumPlayers}`;
+  )[0].innerText = `${roomPlayersData ? roomPlayersData.length : 0}/${data.maxNumPlayers}`;
   // if a game has started
   if (gameData) {
     $('.gameInfoMaxPlayers').addClass('hidden');
   } else {
     $('.gameInfoMaxPlayers').removeClass('hidden');
+  }
+
+  $($('.maxNumPlayers')[0]).val(data.maxNumPlayers);
+  $($('.maxNumPlayers')[1]).val(data.maxNumPlayers);
+  $($('.gameModeSelect')[0]).val(data.gameMode);
+  $($('.gameModeSelect')[1]).val(data.gameMode);
+  $($('.rankedSelect')[0]).val(data.ranked);
+  $($('.rankedSelect')[1]).val(data.ranked);
+  $('.muteSpectators')[0].checked = data.muteSpectators;
+  $('.muteSpectators')[1].checked = data.muteSpectators;
+  $('.disableVoteHistory')[0].checked = data.disableVoteHistory;
+  $('.disableVoteHistory')[1].checked = data.disableVoteHistory;
+  $('.listedInLobby')[0].checked = data.listedInLobby;
+  $('.listedInLobby')[1].checked = data.listedInLobby;
+
+  $('#startGameOptionsAnonymousMode')[0].checked =
+    data.startSettings.anonymousMode;
+  $('#startGameOptionsRevealExactSpyRolesToSpies')[0].checked =
+    data.startSettings.revealExactSpyRolesToSpies;
+  $('#startGameOptionsDefaultPhaseTimeoutMin').val(
+    Math.floor(data.startSettings.timeouts.default / 60000),
+  );
+  $('#startGameOptionsDefaultPhaseTimeoutSec').val(
+    Math.floor((data.startSettings.timeouts.default % 60000) / 1000),
+  );
+  $('#startGameOptionsCritMissionTimeoutMin').val(
+    Math.floor(data.startSettings.timeouts.critMission / 60000),
+  );
+  $('#startGameOptionsCritMissionTimeoutSec').val(
+    Math.floor((data.startSettings.timeouts.critMission % 60000) / 1000),
+  );
+  $('#startGameOptionsAssassinationPhaseTimeoutMin').val(
+    Math.floor(data.startSettings.timeouts.assassination / 60000),
+  );
+  $('#startGameOptionsAssassinationPhaseTimeoutSec').val(
+    Math.floor((data.startSettings.timeouts.assassination % 60000) / 1000),
+  );
+
+  if (roomPlayersData) {
+    enableDisableButtons();
   }
 });
 
@@ -690,6 +749,11 @@ socket.on('gameModes', (GAME_MODE_NAMES) => {
 
   $('.gameModeSelect')[0].innerHTML = str;
   $('.gameModeSelect')[1].innerHTML = str;
+
+  if (roomInfoData) {
+    $($('.gameModeSelect')[0]).val(roomInfoData.gameMode);
+    $($('.gameModeSelect')[1]).val(roomInfoData.gameMode);
+  }
 
   gameModesLoaded = true;
 });
@@ -860,6 +924,13 @@ $('.disableVoteHistory').on('change', (e) => {
   $('.disableVoteHistory')[1].checked = e.target.checked;
 
   socket.emit('update-room-disableVoteHistory', e.target.checked);
+});
+
+$('.listedInLobby').on('change', (e) => {
+  $('.listedInLobby')[0].checked = e.target.checked;
+  $('.listedInLobby')[1].checked = e.target.checked;
+
+  socket.emit('update-room-listed-in-lobby', e.target.checked);
 });
 
 // Update the new room menu with the gameModes available.

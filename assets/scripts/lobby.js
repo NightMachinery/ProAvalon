@@ -109,10 +109,65 @@ let roomPlayersData;
 let roomSpectatorsData;
 let seeData;
 let gameData;
+let roomInfoData;
 let roomId;
 let gameStarted = false;
 
 let isSpectator = false;
+
+function getRoomIdFromUrl() {
+  const url = new URL(window.location.href);
+  const roomIdStr = url.searchParams.get('roomId');
+  if (!roomIdStr) {
+    return undefined;
+  }
+
+  const parsed = parseInt(roomIdStr, 10);
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
+function setRoomUrl(nextRoomId) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('roomId', nextRoomId.toString());
+  window.history.replaceState({}, '', url.toString());
+}
+
+function setLobbyUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('roomId');
+  window.history.replaceState({}, '', url.toString());
+}
+
+function copyTextHttpSafe(text) {
+  if (!text) {
+    return false;
+  }
+
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.setAttribute('readonly', 'readonly');
+  textArea.style.position = 'fixed';
+  textArea.style.left = '-9999px';
+  textArea.style.top = '0';
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  let copied = false;
+
+  try {
+    copied = document.execCommand('copy');
+  } catch (error) {
+    copied = false;
+  }
+
+  document.body.removeChild(textArea);
+  return copied;
+}
+
+function isCurrentUserHost() {
+  return roomInfoData && roomInfoData.isHost === true;
+}
 
 // window resize, repaint the users
 window.addEventListener('resize', () => {
@@ -803,6 +858,7 @@ function enableDisableButtons() {
   // Hide the buttons. Unhide them as we need.
   document.querySelector(buttons.green).classList.add('hidden');
   document.querySelector(buttons.red).classList.add('hidden');
+  document.querySelector('#restartRoomButton').classList.add('hidden');
   // Claim button is never hidden, only disabled
   // document.querySelector(buttons["claim"]).classList.add("hidden");
 
@@ -893,6 +949,17 @@ function enableDisableButtons() {
     }
     if (gameData.buttons.red.setText !== undefined) {
       btnSetText('red', gameData.buttons.red.setText);
+    }
+  }
+
+  if (gameStarted === true && isCurrentUserHost()) {
+    document.querySelector('#restartRoomButton').classList.remove('hidden');
+    if (gameData && gameData.phase === 'Finished') {
+      document.querySelector('#restartRoomButton').innerText = 'New game';
+    } else if (gameData && gameData.phase === 'Voided') {
+      document.querySelector('#restartRoomButton').innerText = 'Restart lobby';
+    } else {
+      document.querySelector('#restartRoomButton').innerText = 'Cancel game';
     }
   }
 }
@@ -1018,6 +1085,9 @@ function strOfAvatar(playerData, alliance) {
         }
       }
     }
+  } else if (playerData.disconnected === true) {
+    var roleWid = ctx.measureText('Disconnected').width + 20;
+    role = `<p class='role-p' style='width: ${roleWid}px; margin: auto;'>Disconnected</p>`;
   }
 
   // add in the hammer star
@@ -1073,7 +1143,9 @@ function strOfAvatar(playerData, alliance) {
     colourToHighlightChatButton = '';
   }
 
-  let str = `<div usernameofplayer='${playerData.username}' ${playerData.anonUsername ? `anonusernameofplayer=${playerData.anonUsername}` : ''} class='playerDiv ${selectedAvatar}''>`;
+  let str = `<div usernameofplayer='${playerData.username}' ${playerData.anonUsername ? `anonusernameofplayer=${playerData.anonUsername}` : ''} class='playerDiv ${selectedAvatar} ${
+    playerData.disconnected === true ? 'leftRoom' : ''
+  }''>`;
 
   str += "<span class='avatarOptionButtons'>";
   str +=
@@ -1475,6 +1547,7 @@ function getKickPlayers() {
 const gameEndSoundPlayed = false;
 function resetAllGameData() {
   roomId = undefined;
+  roomInfoData = undefined;
   // reset all the variables
   roomPlayersData = undefined;
   seeData = undefined;
@@ -1494,6 +1567,8 @@ function resetAllGameData() {
 
   // hide the options cog
   document.querySelector('#options-button').classList.add('hidden');
+  document.querySelector('#restartRoomButton').classList.add('hidden');
+  setLobbyUrl();
 
   // reset room-chat
   // console.log("RESET ROOM CHAT");
@@ -1514,6 +1589,36 @@ function resetAllGameData() {
 
   // leaving room so reset the possible autocomplete stuff
   // autoCompleteStrs = currentOnlinePlayers;
+}
+
+function resetGameToWaitingLobby() {
+  gameData = undefined;
+  gameStarted = false;
+  seeData = undefined;
+  selectedAvatars = {};
+
+  print_gameplay_text_game_started = false;
+  print_gameplay_text_picked_team = false;
+  print_gameplay_text_vote_results = false;
+  print_last_mission_num = 1;
+
+  oldProposedTeam = false;
+
+  document.querySelector('#options-button').classList.remove('hidden');
+  document.querySelector('#restartRoomButton').classList.add('hidden');
+
+  $('.room-chat-list').html('');
+  $('.voteHistoryTableClass')[0].innerHTML = '';
+  $('.voteHistoryTableClass')[1].innerHTML = '';
+  $('.cardHistoryClass')[0].innerHTML = '';
+  $('.cardHistoryClass')[1].innerHTML = '';
+  $('#missionsBox').addClass('invisible');
+
+  lastPickNum = 0;
+  lastMissionNum = 0;
+
+  enableDisableButtons();
+  draw();
 }
 
 let tempVar = 0;

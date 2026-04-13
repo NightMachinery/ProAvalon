@@ -99,6 +99,10 @@
   <div id="div1Resize">
     <div class="room-container">
       <button id="backButton" class="btn btn-warning">Back</button>
+      <button id="copyRoomLinkButton" class="btn btn-info">Copy link</button>
+      <button id="restartRoomButton" class="btn btn-warning hidden">
+        Restart lobby
+      </button>
 
       <button id="claimButton" class="disabled btn btn-primary">Claim</button>
 
@@ -974,6 +978,13 @@
         <br>
         <label>Anonymous mode:</label>
         <input type="checkbox" name="startGameOptionsAnonymousMode" id="startGameOptionsAnonymousMode"/>
+        <br>
+        <label>Show exact evil roles to evil team:</label>
+        <input
+          type="checkbox"
+          name="startGameOptionsRevealExactSpyRolesToSpies"
+          id="startGameOptionsRevealExactSpyRolesToSpies"
+        />
 
         <div class="row">
           <div
@@ -1008,6 +1019,9 @@
         <br />
         <label>Disable Vote History:</label>
         <input type="checkbox" name="disableVoteHistory" class="disableVoteHistory"/>
+        <br />
+        <label>Show room in main list:</label>
+        <input type="checkbox" name="listedInLobby" class="listedInLobby" checked />
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">
@@ -1251,6 +1265,9 @@
         <br/>
         <label>Close Vote History:</label>
         <input type="checkbox" name="disableVoteHistory" class="disableVoteHistory" />
+        <br/>
+        <label>Show room in main list:</label>
+        <input type="checkbox" name="listedInLobby" class="listedInLobby" checked />
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-danger" data-dismiss="modal">

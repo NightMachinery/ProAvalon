@@ -578,6 +578,8 @@ export const server = function (io: SocketServer): void {
     socket.on('update-room-ranked', updateRoomRanked);
     socket.on('update-room-muteSpectators', updateRoomMuteSpectators);
     socket.on('update-room-disableVoteHistory', updateRoomDisableVoteHistory);
+    socket.on('update-room-listed-in-lobby', updateRoomListedInLobby);
+    socket.on('restart-room', restartRoom);
     socket.on('gameMove', gameMove);
     socket.on('setClaim', setClaim);
 
@@ -901,35 +903,35 @@ export const updateCurrentGamesList = function () {
   const gamesList = [];
   for (let i = 0; i < rooms.length; i++) {
     // If the game exists
-    if (rooms[i]) {
-      // create new array to send
-      gamesList[i] = {};
+    if (rooms[i] && rooms[i].listedInLobby !== false) {
+      const game = {};
       // get status of game
-      gamesList[i].status = rooms[i].getStatus();
+      game.status = rooms[i].getStatus();
 
       if (rooms[i].joinPassword !== undefined) {
-        gamesList[i].passwordLocked = true;
+        game.passwordLocked = true;
       } else {
-        gamesList[i].passwordLocked = false;
+        game.passwordLocked = false;
       }
       // get room ID
-      gamesList[i].roomId = rooms[i].roomId;
-      gamesList[i].gameMode =
+      game.roomId = rooms[i].roomId;
+      game.gameMode =
         rooms[i].gameMode.charAt(0).toUpperCase() + rooms[i].gameMode.slice(1);
-      gamesList[i].gameType = rooms[i].ranked ? 'Ranked' : 'Unranked';
+      game.gameType = rooms[i].ranked ? 'Ranked' : 'Unranked';
       // console.log("Room " + rooms[i].roomId + " has host: " + rooms[i].host);
-      gamesList[i].hostUsername = rooms[i].host;
+      game.hostUsername = rooms[i].host;
       if (rooms[i].gameStarted === true) {
-        gamesList[i].numOfPlayersInside = rooms[i].playersInGame.length;
-        gamesList[i].missionHistory = rooms[i].missionHistory;
-        gamesList[i].missionNum = rooms[i].missionNum;
-        gamesList[i].pickNum = rooms[i].pickNum;
+        game.numOfPlayersInside = rooms[i].playersInGame.length;
+        game.missionHistory = rooms[i].missionHistory;
+        game.missionNum = rooms[i].missionNum;
+        game.pickNum = rooms[i].pickNum;
       } else {
-        gamesList[i].numOfPlayersInside = rooms[i].socketsOfPlayers.length;
+        game.numOfPlayersInside = rooms[i].socketsOfPlayers.length;
       }
-      gamesList[i].maxNumPlayers = rooms[i].maxNumPlayers;
-      gamesList[i].numOfSpectatorsInside =
-        rooms[i].allSockets.length - rooms[i].socketsOfPlayers.length;
+      game.maxNumPlayers = rooms[i].maxNumPlayers;
+      game.numOfSpectatorsInside =
+        rooms[i].allSockets.length - rooms[i].getConnectedPlayerCount();
+      gamesList.push(game);
     }
   }
   allSockets.forEach((sock) => {
@@ -1025,11 +1027,115 @@ export function destroyRoom(roomId) {
   console.log(`Destroyed room ${roomId}.`);
 }
 
-function playerLeaveRoomCheckDestroy(socket) {
+function getRestartSeatSnapshots(room: GameWrapper) {
+  if (room.restartPlayerSeats && room.restartPlayerSeats.length > 0) {
+    return room.restartPlayerSeats.map((seat) => room.createReservedSeat(seat));
+  }
+
+  return room.socketsOfPlayers.map((seat) => room.createReservedSeat(seat));
+}
+
+function restartRoomToWaitingLobby(roomId: number, restartedBy: string) {
+  const oldRoom = rooms[roomId];
+  if (!oldRoom) {
+    return;
+  }
+
+  quote.deleteRoomMessages(roomId);
+  deleteSaveGameFromDb(oldRoom);
+
+  if (oldRoom.interval) {
+    clearInterval(oldRoom.interval);
+    oldRoom.interval = undefined;
+  }
+
+  oldRoom.socketsOfPlayers
+    .filter((socket) => socket && socket.isBotSocket && socket.handleGameOver)
+    .forEach((botSocket) => {
+      botSocket.handleGameOver(oldRoom, 'complete', () => {});
+    });
+
+  const roomConfig = new RoomConfig(
+    oldRoom.host,
+    roomId,
+    ioGlobal,
+    oldRoom.maxNumPlayers,
+    oldRoom.joinPassword,
+    oldRoom.gameMode,
+    oldRoom.ranked,
+    readyPrompt,
+    oldRoom.listedInLobby,
+  );
+  const gameConfig = new GameConfig(
+    roomConfig,
+    oldRoom.muteSpectators,
+    oldRoom.disableVoteHistory,
+    oldRoom.roomCreationType,
+    () => new Date(),
+  );
+
+  const restartedRoom = new GameWrapper(gameConfig, socketCallback);
+  restartedRoom.kickedPlayers = oldRoom.kickedPlayers
+    ? oldRoom.kickedPlayers.slice()
+    : [];
+  restartedRoom.options = oldRoom.options ? oldRoom.options.slice() : [];
+
+  const timeouts = oldRoom.gameTimer
+    ? oldRoom.gameTimer.getTimeouts()
+    : { default: 0, critMission: 0, assassination: 0 };
+  restartedRoom.configureTimeouts(timeouts);
+  restartedRoom.configureAnonymousMode(Boolean(oldRoom.anonymousMode));
+  restartedRoom.configureRevealExactSpyRolesToSpies(
+    Boolean(oldRoom.revealExactSpyRolesToSpies),
+  );
+
+  const liveSockets = oldRoom.allSockets.slice();
+  const restartSeatSnapshots = getRestartSeatSnapshots(oldRoom);
+  restartedRoom.restartPlayerSeats = restartSeatSnapshots.map((seat) =>
+    restartedRoom.createReservedSeat(seat),
+  );
+  restartedRoom.socketsOfPlayers = restartSeatSnapshots.map((seat) => {
+    const liveSocket = liveSockets.find(
+      (socket) =>
+        socket.request.user.username.toLowerCase() ===
+        seat.request.user.username.toLowerCase(),
+    );
+
+    return liveSocket || restartedRoom.createReservedSeat(seat);
+  });
+  restartedRoom.allSockets = liveSockets.slice();
+  restartedRoom.botSockets = liveSockets.filter(
+    (socket) => socket.isBotSocket === true,
+  );
+
+  rooms[roomId] = restartedRoom;
+  oldRoom.destructor();
+
+  liveSockets.forEach((socket) => {
+    restartedRoom.sendOutGameModesInRoomToSocket(socket);
+    socket.emit('room-reset-to-waiting', {
+      restartedBy,
+      roomId,
+    });
+  });
+
+  restartedRoom.updateRoomPlayers();
+  restartedRoom.sendText(
+    `${restartedBy} restarted the room and returned it to the waiting lobby.`,
+    'server-text',
+  );
+  updateCurrentGamesList();
+}
+
+function playerLeaveRoomCheckDestroy(socket, preserveSeatOnDisconnect = false) {
   const roomId = socket.request.user.inRoomId;
   if (roomId && rooms[roomId]) {
     // leave the room
-    rooms[roomId].playerLeaveRoom(socket);
+    if (preserveSeatOnDisconnect) {
+      rooms[roomId].playerDisconnectRoom(socket);
+    } else {
+      rooms[roomId].playerLeaveRoom(socket);
+    }
     const toDestroy = rooms[roomId].destroyRoom;
 
     // if the game has started, wait to destroy to prevent lag spikes closing ongoing rooms
@@ -1141,8 +1247,13 @@ function disconnect(data) {
       username = this.request.user.username;
     }
 
+    const roomLeaveMessage =
+      rooms[inRoomId] && rooms[inRoomId].gameStarted
+        ? `${username} has left the room.`
+        : `${username} has disconnected from the room.`;
+
     data = {
-      message: `${username} has left the room.`,
+      message: roomLeaveMessage,
       classStr: 'server-text-teal',
       dateCreated: new Date(),
     };
@@ -1152,7 +1263,7 @@ function disconnect(data) {
     rooms[inRoomId].votePauseTimeout(this, true);
   }
 
-  playerLeaveRoomCheckDestroy(this);
+  playerLeaveRoomCheckDestroy(this, true);
 
   matchmakingQueue.removeUser(this.request.user.username);
   sendNumPlayersInQueueToEveryone();
@@ -1430,6 +1541,10 @@ function newRoom(dataObj) {
       return;
     }
 
+    if (dataObj.listedInLobby !== true && dataObj.listedInLobby !== false) {
+      return;
+    }
+
     // while rooms exist already (in case of a previously saved and retrieved game)
     while (rooms[nextRoomId]) {
       incrementNextRoomId();
@@ -1447,6 +1562,7 @@ function newRoom(dataObj) {
       strToGameMode(dataObj.gameMode),
       rankedRoom,
       readyPrompt,
+      dataObj.listedInLobby,
     );
     const gameConfig = new GameConfig(
       roomConfig,
@@ -1461,11 +1577,13 @@ function newRoom(dataObj) {
     const privateStr = !privateRoom ? '' : 'private ';
     const rankedUnrankedStr = rankedRoom ? 'ranked' : 'unranked';
 
-    const data = {
-      message: `${this.request.user.username} has created ${rankedUnrankedStr} ${privateStr}room ${nextRoomId}.`,
-      classStr: 'server-text',
-    };
-    sendToAllChat(ioGlobal, data);
+    if (dataObj.listedInLobby !== false) {
+      const data = {
+        message: `${this.request.user.username} has created ${rankedUnrankedStr} ${privateStr}room ${nextRoomId}.`,
+        classStr: 'server-text',
+      };
+      sendToAllChat(ioGlobal, data);
+    }
 
     // send to allChat including the host of the game
     // ioGlobal.in("allChat").emit("new-game-created", str);
@@ -1510,7 +1628,8 @@ function joinRoom(roomId, inputPassword) {
       this.emit('roomChatToClient', rooms[roomId].chatHistory);
     }
   } else {
-    // console.log("Game doesn't exist!");
+    this.emit('danger-alert', 'That room does not exist.');
+    this.emit('changeView', 'lobby');
   }
 }
 
@@ -1579,6 +1698,7 @@ function startGame(data) {
   const options = data.options;
   const gameMode = data.gameMode;
   const anonymousMode = data.anonymousMode;
+  const revealExactSpyRolesToSpies = data.revealExactSpyRolesToSpies === true;
   const timeoutsStr = data.timeouts;
 
   // start the game
@@ -1615,11 +1735,15 @@ function startGame(data) {
   ) {
     rooms[this.request.user.inRoomId].configureTimeouts(timeouts);
     rooms[this.request.user.inRoomId].configureAnonymousMode(anonymousMode);
+    rooms[this.request.user.inRoomId].configureRevealExactSpyRolesToSpies(
+      revealExactSpyRolesToSpies,
+    );
     rooms[this.request.user.inRoomId].hostTryStartGame(
       options,
       gameMode,
       timeouts,
       anonymousMode,
+      revealExactSpyRolesToSpies,
     );
   }
 }
@@ -1944,11 +2068,41 @@ function updateRoomDisableVoteHistory(disableVoteHistory) {
   }
 }
 
+function updateRoomListedInLobby(listedInLobby) {
+  if (rooms[this.request.user.inRoomId]) {
+    rooms[this.request.user.inRoomId].updateListedInLobby(
+      this,
+      listedInLobby,
+    );
+  }
+  updateCurrentGamesList();
+}
+
 function updateRoomMaxPlayers(number) {
   if (rooms[this.request.user.inRoomId]) {
     rooms[this.request.user.inRoomId].updateMaxNumPlayers(this, number);
   }
   updateCurrentGamesList();
+}
+
+function restartRoom() {
+  const roomId = this.request.user.inRoomId;
+  if (!roomId || !rooms[roomId]) {
+    return;
+  }
+
+  const room = rooms[roomId];
+  if (room.host !== this.request.user.username) {
+    this.emit('danger-alert', 'Only the host can restart this room.');
+    return;
+  }
+
+  if (!room.gameStarted) {
+    this.emit('danger-alert', 'There is no current game to restart.');
+    return;
+  }
+
+  restartRoomToWaitingLobby(roomId, this.request.user.username);
 }
 
 export const GetLastFiveMinsAllChat = () => {
