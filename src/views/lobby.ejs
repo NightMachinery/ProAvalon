@@ -1270,6 +1270,19 @@
         <br/>
         <label>Show room in main list:</label>
         <input type="checkbox" name="listedInLobby" class="listedInLobby" checked />
+        <br/>
+        <label>Empty room TTL (minutes):</label>
+        <input
+          type="number"
+          id="emptyRoomTTLMinutes"
+          min="1"
+          max="10080"
+          step="1"
+          value="10"
+        />
+        <p class="help-block">
+          Starts only after the room becomes empty from disconnect. If the last person explicitly leaves, the room closes immediately.
+        </p>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-danger" data-dismiss="modal">

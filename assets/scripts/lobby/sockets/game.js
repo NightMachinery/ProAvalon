@@ -16,6 +16,8 @@ socket.on('game-data', (data) => {
 
     // console.log(data);
     gameData = data;
+    publicRoomId = data.publicRoomId;
+    roomJoinRef = data.publicRoomId || roomJoinRef;
 
     // if the game has only just started for the first time, display your role
     if (gameStarted === false) {

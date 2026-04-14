@@ -148,12 +148,13 @@ function setCopyRoomLinkButtonState(text, className) {
 }
 
 document.querySelector('#copyRoomLinkButton').addEventListener('click', () => {
-  if (!roomId) {
+  const inviteRef = publicRoomId || roomJoinRef;
+  if (!inviteRef) {
     return;
   }
 
   const copied = copyTextHttpSafe(
-    `${window.location.origin}/lobby?roomId=${roomId}`,
+    `${window.location.origin}/lobby?room=${inviteRef}`,
   );
 
   clearTimeout(copyRoomLinkFeedbackTimeout);
@@ -197,15 +198,22 @@ function leaveRoom() {
   resetAllGameData();
 }
 
-function joinRoom(roomId_) {
-  socket.emit('join-room', roomId_);
+function joinRoom(roomRef, nextRoomId, nextPublicRoomId) {
+  socket.emit('join-room', roomRef);
   // change the view to the room instead of lobby
-  roomId = roomId_;
-  setRoomUrl(roomId_);
+  roomId = nextRoomId;
+  publicRoomId = nextPublicRoomId;
+  roomJoinRef = roomRef;
+  setRoomUrl(roomRef);
   // set the spectator to true
   isSpectator = true;
   // change to the game room view
   changeView();
+}
+
+function setNewRoomTTLInputToDefault() {
+  const listedInLobby = $('.listedInLobby')[1].checked;
+  $('#emptyRoomTTLMinutes').val(getDefaultEmptyRoomTTLMinutes(listedInLobby));
 }
 
 document.querySelector('#claimButton').addEventListener('click', () => {
@@ -230,6 +238,7 @@ $('#newRoom').on('click', (data) => {
   // 10p default
   $('.maxNumPlayers').val('10');
   $('.listedInLobby')[1].checked = true;
+  setNewRoomTTLInputToDefault();
 
   // $(".gun").css("visibility", "hidden");
 
@@ -249,6 +258,7 @@ $('#createNewRoomButton').on('click', (data) => {
     muteSpectators: $('.muteSpectators')[1].checked,
     disableVoteHistory: $('.disableVoteHistory')[1].checked,
     listedInLobby: $('.listedInLobby')[1].checked,
+    emptyRoomTTLMinutes: $('#emptyRoomTTLMinutes').val(),
     ranked: $($('.rankedSelect')[1]).val(),
   };
 
@@ -264,6 +274,10 @@ $('#createNewRoomButton').on('click', (data) => {
   resetAllGameData();
 
   $('#newRoomModal').modal('hide');
+});
+
+$('#newRoomModal .listedInLobby').on('change', () => {
+  setNewRoomTTLInputToDefault();
 });
 
 $('#startGameOptionsDefaultPhaseTimeoutMin').on('change', () => {

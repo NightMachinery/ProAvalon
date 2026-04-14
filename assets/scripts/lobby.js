@@ -111,12 +111,28 @@ let seeData;
 let gameData;
 let roomInfoData;
 let roomId;
+let publicRoomId;
+let roomJoinRef;
 let gameStarted = false;
 
 let isSpectator = false;
 
-function getRoomIdFromUrl() {
+const DEFAULT_LISTED_EMPTY_ROOM_TTL_MINUTES = 10;
+const DEFAULT_UNLISTED_EMPTY_ROOM_TTL_MINUTES = 72 * 60;
+
+function getDefaultEmptyRoomTTLMinutes(isListedInLobby) {
+  return isListedInLobby
+    ? DEFAULT_LISTED_EMPTY_ROOM_TTL_MINUTES
+    : DEFAULT_UNLISTED_EMPTY_ROOM_TTL_MINUTES;
+}
+
+function getRoomRefFromUrl() {
   const url = new URL(window.location.href);
+  const publicRoomRef = url.searchParams.get('room');
+  if (publicRoomRef) {
+    return publicRoomRef;
+  }
+
   const roomIdStr = url.searchParams.get('roomId');
   if (!roomIdStr) {
     return undefined;
@@ -126,14 +142,20 @@ function getRoomIdFromUrl() {
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
-function setRoomUrl(nextRoomId) {
+function setRoomUrl(nextRoomRef) {
+  if (nextRoomRef === undefined || nextRoomRef === null || nextRoomRef === '') {
+    return;
+  }
+
   const url = new URL(window.location.href);
-  url.searchParams.set('roomId', nextRoomId.toString());
+  url.searchParams.set('room', nextRoomRef.toString());
+  url.searchParams.delete('roomId');
   window.history.replaceState({}, '', url.toString());
 }
 
 function setLobbyUrl() {
   const url = new URL(window.location.href);
+  url.searchParams.delete('room');
   url.searchParams.delete('roomId');
   window.history.replaceState({}, '', url.toString());
 }
@@ -1547,6 +1569,8 @@ function getKickPlayers() {
 const gameEndSoundPlayed = false;
 function resetAllGameData() {
   roomId = undefined;
+  publicRoomId = undefined;
+  roomJoinRef = undefined;
   roomInfoData = undefined;
   // reset all the variables
   roomPlayersData = undefined;

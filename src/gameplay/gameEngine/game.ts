@@ -1165,6 +1165,7 @@ class Game extends Room {
         );
 
         data[i].roomId = this.roomId;
+        data[i].publicRoomId = this.publicRoomId;
         data[i].toShowGuns = this.toShowGuns();
 
         data[i].publicData = this.getRoleCardPublicGameData();
@@ -1248,6 +1249,7 @@ class Game extends Room {
     );
 
     data.roomId = this.roomId;
+    data.publicRoomId = this.publicRoomId;
     data.toShowGuns = this.toShowGuns();
     data.dateTimerExpires = this.dateTimerExpires;
 

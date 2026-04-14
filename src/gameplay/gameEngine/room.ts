@@ -13,6 +13,7 @@ import { millisToStr } from '../../util/time';
 import { RoomPlayer } from './types';
 import { isMod } from '../../modsadmins/mods';
 import { isAdmin } from '../../modsadmins/admins';
+import { getDefaultEmptyRoomTTLMinutes } from '../../sockets/roomLinkUtils';
 
 export class RoomConfig {
   host: string;
@@ -24,6 +25,8 @@ export class RoomConfig {
   ranked: boolean;
   readyPrompt: ReadyPrompt;
   listedInLobby: boolean;
+  publicRoomId: string;
+  emptyRoomTTLMinutes: number;
 
   constructor(
     host: string,
@@ -35,6 +38,8 @@ export class RoomConfig {
     ranked: boolean,
     readyPrompt: ReadyPrompt,
     listedInLobby = true,
+    publicRoomId?: string,
+    emptyRoomTTLMinutes?: number,
   ) {
     this.host = host;
     this.roomId = roomId;
@@ -45,6 +50,10 @@ export class RoomConfig {
     this.ranked = ranked;
     this.readyPrompt = readyPrompt;
     this.listedInLobby = listedInLobby !== false;
+    this.publicRoomId = publicRoomId;
+    this.emptyRoomTTLMinutes =
+      emptyRoomTTLMinutes ||
+      getDefaultEmptyRoomTTLMinutes(this.listedInLobby !== false);
   }
 
   boundMaxNumPlayers(num: number) {
@@ -74,6 +83,10 @@ class Room {
   gameMode: GameMode;
   ranked: boolean;
   listedInLobby: boolean;
+  publicRoomId: string;
+  emptyRoomTTLMinutes: number;
+  emptyRoomDestroyAt: Date;
+  destroyTimeoutObj: NodeJS.Timeout;
 
   allSockets: SocketUser[];
   socketsOfPlayers: SocketUser[];
@@ -95,6 +108,10 @@ class Room {
     this.ranked = roomConfig.ranked;
     this.readyPrompt = roomConfig.readyPrompt;
     this.listedInLobby = roomConfig.listedInLobby !== false;
+    this.publicRoomId = roomConfig.publicRoomId;
+    this.emptyRoomTTLMinutes = roomConfig.emptyRoomTTLMinutes;
+    this.emptyRoomDestroyAt = undefined;
+    this.destroyTimeoutObj = undefined;
 
     this.gamesRequiredForRanked = 0;
     this.provisionalGamesRequired = 20;
@@ -167,6 +184,9 @@ class Room {
       muteSpectators: Boolean(this.muteSpectators),
       disableVoteHistory: Boolean(this.disableVoteHistory),
       listedInLobby: this.listedInLobby !== false,
+      roomId: this.roomId,
+      publicRoomId: this.publicRoomId,
+      emptyRoomTTLMinutes: this.emptyRoomTTLMinutes,
       startSettings: {
         anonymousMode: Boolean(this.anonymousMode),
         revealExactSpyRolesToSpies: Boolean(this.revealExactSpyRolesToSpies),
@@ -193,7 +213,7 @@ class Room {
         inputPassword === undefined &&
         (socket.isBotSocket === undefined || socket.isBotSocket === false)
       ) {
-        socket.emit('joinPassword', this.roomId);
+        socket.emit('joinPassword', this.publicRoomId || this.roomId);
         // console.log("No password inputted!");
 
         return false;
@@ -236,9 +256,13 @@ class Room {
     this.sendOutGameModesInRoomToSocket(socket);
 
     // If a player joins the game while empty ensure that the destruction process is aborted
-    if (this.destroyRoom) {
+    if (this.destroyRoom || this.emptyRoomDestroyAt || this.destroyTimeoutObj) {
       this.destroyRoom = false;
-      clearTimeout(this.destroyTimeoutObj);
+      if (this.destroyTimeoutObj) {
+        clearTimeout(this.destroyTimeoutObj);
+      }
+      this.destroyTimeoutObj = undefined;
+      this.emptyRoomDestroyAt = undefined;
       console.log(
         `Player joined empty room ${this.roomId}, destruction aborted.`,
       );

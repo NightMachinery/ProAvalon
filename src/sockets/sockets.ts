@@ -16,6 +16,7 @@ import { isMod } from '../modsadmins/mods';
 import { isPercival } from '../modsadmins/percivals';
 import { isTO } from '../modsadmins/tournamentOrganizers';
 import { GAME_MODE_NAMES, GameMode, isGameMode, strToGameMode } from '../gameplay/gameEngine/gameModes';
+import crypto from 'crypto';
 
 import { ChatSpamFilter } from './filters/chatSpamFilter';
 import { MessageWithDate, Quote } from './quote';
@@ -30,7 +31,7 @@ import { mrevealallroles } from './commands/mod/mrevealallroles';
 import * as util from 'util';
 import { RoomCreationType } from '../gameplay/gameEngine/roomTypes';
 import { CreateRoomFilter } from './filters/createRoomFilter';
-import Game, { GameConfig } from '../gameplay/gameEngine/game';
+import Game, { GameConfig, WAITING } from '../gameplay/gameEngine/game';
 import { RoomConfig } from '../gameplay/gameEngine/room';
 import { MatchmakingQueue, QueueEntry } from './matchmakingQueue';
 import { ReadyPrompt, ReadyPromptReplyFromClient } from './readyPrompt';
@@ -41,6 +42,12 @@ import { Card } from '../gameplay/gameEngine/cards/types';
 import { isSelfHostEnv } from '../util/runtime';
 import { TOCommandsImported } from './commands/tournamentOrganisers';
 import { uniqueLoginsMetric } from '../metrics/miscellaneousMetrics';
+import {
+  getDefaultEmptyRoomTTLMinutes,
+  normalizeEmptyRoomTTLMinutes,
+  resolveRoomIdFromJoinRef,
+  roomHasConnectedUsers,
+} from './roomLinkUtils';
 
 const ONE_DAY_MILLIS = 24 * 60 * 60 * 1000; // 1 day
 
@@ -72,9 +79,108 @@ export let allSockets: SocketUser[] = [];
 // TODO: This is bad!!! We should work to make this not needed to be exported.
 export const rooms: GameWrapper[] = [];
 export let nextRoomId = 1;
+const publicRoomIdLookup = new Map<string, number>();
 
 export function incrementNextRoomId(): void {
   nextRoomId++;
+}
+
+function createPublicRoomId(): string {
+  return crypto.randomUUID().replace(/-/g, '');
+}
+
+function assignPublicRoomId(room: GameWrapper): void {
+  if (!room) {
+    return;
+  }
+
+  const existingPublicRoomId = room.publicRoomId;
+  if (
+    existingPublicRoomId &&
+    (!publicRoomIdLookup.has(existingPublicRoomId) ||
+      publicRoomIdLookup.get(existingPublicRoomId) === room.roomId)
+  ) {
+    publicRoomIdLookup.set(existingPublicRoomId, room.roomId);
+    return;
+  }
+
+  let publicRoomId = createPublicRoomId();
+  while (publicRoomIdLookup.has(publicRoomId)) {
+    publicRoomId = createPublicRoomId();
+  }
+
+  room.publicRoomId = publicRoomId;
+  publicRoomIdLookup.set(publicRoomId, room.roomId);
+}
+
+function unregisterPublicRoomId(room: GameWrapper): void {
+  if (!room || !room.publicRoomId) {
+    return;
+  }
+
+  if (publicRoomIdLookup.get(room.publicRoomId) === room.roomId) {
+    publicRoomIdLookup.delete(room.publicRoomId);
+  }
+}
+
+function cancelPendingEmptyRoomDestroy(room: GameWrapper): void {
+  if (!room) {
+    return;
+  }
+
+  room.destroyRoom = false;
+
+  if (room.destroyTimeoutObj) {
+    clearTimeout(room.destroyTimeoutObj);
+    room.destroyTimeoutObj = undefined;
+  }
+
+  room.emptyRoomDestroyAt = undefined;
+}
+
+function scheduleEmptyRoomDestroy(roomId: number): void {
+  const room = rooms[roomId];
+  if (
+    !room ||
+    room.gameStarted === true ||
+    room.getStatus() !== WAITING ||
+    roomHasConnectedUsers(room)
+  ) {
+    return;
+  }
+
+  cancelPendingEmptyRoomDestroy(room);
+
+  const delayMs = room.emptyRoomTTLMinutes * 60 * 1000;
+  room.emptyRoomDestroyAt = new Date(Date.now() + delayMs);
+  room.destroyTimeoutObj = setTimeout(() => {
+    const latestRoom = rooms[roomId];
+    if (
+      latestRoom &&
+      latestRoom.roomId === roomId &&
+      latestRoom.gameStarted !== true &&
+      latestRoom.getStatus() === WAITING &&
+      !roomHasConnectedUsers(latestRoom)
+    ) {
+      destroyRoom(roomId);
+    }
+  }, delayMs);
+}
+
+function destroyRecoverableWaitingRoomsForHost(username: string): void {
+  const hostUsername = username.toLowerCase();
+
+  for (const room of rooms) {
+    if (
+      room &&
+      room.getStatus() === WAITING &&
+      room.host &&
+      room.host.toLowerCase() === hostUsername &&
+      !roomHasConnectedUsers(room)
+    ) {
+      destroyRoom(room.roomId);
+    }
+  }
 }
 
 const allChat5Min: any[] = [];
@@ -182,6 +288,9 @@ if (process.env.NODE_ENV !== 'test') {
                 storedData.gameMode,
                 undefined,
                 undefined,
+                storedData.listedInLobby,
+                storedData.publicRoomId,
+                storedData.emptyRoomTTLMinutes,
               );
               const gameConfig = new GameConfig(
                 roomConfig,
@@ -199,6 +308,7 @@ if (process.env.NODE_ENV !== 'test') {
               rooms[storedData.roomId].recoverGame(storedData);
               rooms[storedData.roomId].timeFrozenLoaded = new Date();
               rooms[storedData.roomId].callback = socketCallback;
+              assignPublicRoomId(rooms[storedData.roomId]);
             } else {
               run = false;
             }
@@ -929,6 +1039,7 @@ export const updateCurrentGamesList = function () {
         game.numOfPlayersInside = rooms[i].socketsOfPlayers.length;
       }
       game.maxNumPlayers = rooms[i].maxNumPlayers;
+      game.publicRoomId = rooms[i].publicRoomId;
       game.numOfSpectatorsInside =
         rooms[i].allSockets.length - rooms[i].getConnectedPlayerCount();
       gamesList.push(game);
@@ -1004,6 +1115,9 @@ export function destroyRoom(roomId) {
     return;
   }
 
+  cancelPendingEmptyRoomDestroy(rooms[roomId]);
+  unregisterPublicRoomId(rooms[roomId]);
+
   quote.deleteRoomMessages(roomId);
 
   deleteSaveGameFromDb(rooms[roomId]);
@@ -1065,6 +1179,8 @@ function restartRoomToWaitingLobby(roomId: number, restartedBy: string) {
     oldRoom.ranked,
     readyPrompt,
     oldRoom.listedInLobby,
+    oldRoom.publicRoomId,
+    oldRoom.emptyRoomTTLMinutes,
   );
   const gameConfig = new GameConfig(
     roomConfig,
@@ -1109,6 +1225,7 @@ function restartRoomToWaitingLobby(roomId: number, restartedBy: string) {
   );
 
   rooms[roomId] = restartedRoom;
+  assignPublicRoomId(restartedRoom);
   oldRoom.destructor();
 
   liveSockets.forEach((socket) => {
@@ -1130,13 +1247,27 @@ function restartRoomToWaitingLobby(roomId: number, restartedBy: string) {
 function playerLeaveRoomCheckDestroy(socket, preserveSeatOnDisconnect = false) {
   const roomId = socket.request.user.inRoomId;
   if (roomId && rooms[roomId]) {
+    const room = rooms[roomId];
+
     // leave the room
     if (preserveSeatOnDisconnect) {
-      rooms[roomId].playerDisconnectRoom(socket);
+      room.playerDisconnectRoom(socket);
     } else {
-      rooms[roomId].playerLeaveRoom(socket);
+      room.playerLeaveRoom(socket);
     }
-    const toDestroy = rooms[roomId].destroyRoom;
+
+    if (
+      preserveSeatOnDisconnect &&
+      room &&
+      room.gameStarted !== true &&
+      room.getStatus() === WAITING &&
+      !roomHasConnectedUsers(room)
+    ) {
+      scheduleEmptyRoomDestroy(roomId);
+      room.destroyRoom = false;
+    }
+
+    const toDestroy = room && room.destroyRoom;
 
     // if the game has started, wait to destroy to prevent lag spikes closing ongoing rooms
     if (toDestroy) {
@@ -1513,6 +1644,8 @@ function newRoom(dataObj) {
   if (dataObj && !this.request.user.inRoomId) {
     const username = this.request.user.usernameLower;
 
+    destroyRecoverableWaitingRoomsForHost(username);
+
     if (!createRoomFilter.createRoomRequest(username, rooms)) {
       return;
     }
@@ -1545,6 +1678,11 @@ function newRoom(dataObj) {
       return;
     }
 
+    const emptyRoomTTLMinutes = normalizeEmptyRoomTTLMinutes(
+      dataObj.emptyRoomTTLMinutes,
+      dataObj.listedInLobby,
+    );
+
     // while rooms exist already (in case of a previously saved and retrieved game)
     while (rooms[nextRoomId]) {
       incrementNextRoomId();
@@ -1563,6 +1701,8 @@ function newRoom(dataObj) {
       rankedRoom,
       readyPrompt,
       dataObj.listedInLobby,
+      undefined,
+      emptyRoomTTLMinutes,
     );
     const gameConfig = new GameConfig(
       roomConfig,
@@ -1573,6 +1713,7 @@ function newRoom(dataObj) {
     );
 
     rooms[nextRoomId] = new GameWrapper(gameConfig, socketCallback);
+    assignPublicRoomId(rooms[nextRoomId]);
 
     const privateStr = !privateRoom ? '' : 'private ';
     const rankedUnrankedStr = rankedRoom ? 'ranked' : 'unranked';
@@ -1588,7 +1729,12 @@ function newRoom(dataObj) {
     // send to allChat including the host of the game
     // ioGlobal.in("allChat").emit("new-game-created", str);
     // send back room id to host so they can auto connect
-    this.emit('auto-join-room-id', nextRoomId, dataObj.newRoomPassword);
+    this.emit(
+      'auto-join-room-id',
+      nextRoomId,
+      rooms[nextRoomId].publicRoomId,
+      dataObj.newRoomPassword,
+    );
 
     // increment index for next game
     incrementNextRoomId();
@@ -1596,8 +1742,9 @@ function newRoom(dataObj) {
   }
 }
 
-function joinRoom(roomId, inputPassword) {
+function joinRoom(roomRef, inputPassword) {
   // console.log("inputpassword: " + inputPassword);
+  const roomId = resolveRoomIdFromJoinRef(roomRef, rooms, publicRoomIdLookup);
 
   // if the room exists and the player is not currently in a room
   if (rooms[roomId] && !this.request.user.inRoomId) {
@@ -1933,6 +2080,9 @@ function matchFound(usernames: string[]): void {
         GameMode.AVALON,
         true,
         readyPrompt,
+        true,
+        undefined,
+        getDefaultEmptyRoomTTLMinutes(true),
       );
       const gameConfig = new GameConfig(
         roomConfig,
@@ -1944,6 +2094,7 @@ function matchFound(usernames: string[]): void {
 
       rooms[nextRoomId] = new GameWrapper(gameConfig, socketCallback);
       const room = rooms[nextRoomId];
+      assignPublicRoomId(room);
 
       room.configureTimeouts({
         default: 1.5 * 60 * 1000,
@@ -1996,6 +2147,7 @@ function matchFound(usernames: string[]): void {
 
         socket.emit('match-found-join-room', {
           roomId: nextRoomId,
+          publicRoomId: room.publicRoomId,
         });
         socket.emit('queueStatus', { joined: false });
       }

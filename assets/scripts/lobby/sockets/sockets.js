@@ -21,7 +21,7 @@ socket.on('joinedGameSuccess', (data) => {
 let intervalId = 0;
 let attemptNumber = 0;
 const MAX_NUM_TRIES = 5;
-const initialRoomIdFromUrl = getRoomIdFromUrl();
+const initialRoomRefFromUrl = getRoomRefFromUrl();
 let initialRoomJoinAttempted = false;
 
 function stopReconnectInterval() {
@@ -39,16 +39,18 @@ socket.on('connect', () => {
   hideDangerAlert();
   stopReconnectInterval();
 
-  if (roomId !== undefined) {
+  if (roomJoinRef !== undefined) {
+    const roomJoinRefCopy = roomJoinRef;
     const roomIdCopy = roomId;
+    const publicRoomIdCopy = publicRoomId;
     leaveRoom();
-    joinRoom(roomIdCopy);
+    joinRoom(roomJoinRefCopy, roomIdCopy, publicRoomIdCopy);
   } else if (
     initialRoomJoinAttempted === false &&
-    initialRoomIdFromUrl !== undefined
+    initialRoomRefFromUrl !== undefined
   ) {
     initialRoomJoinAttempted = true;
-    joinRoom(initialRoomIdFromUrl);
+    joinRoom(initialRoomRefFromUrl);
   }
 
   if (!firstTimeConnected) {
@@ -439,7 +441,11 @@ socket.on('update-current-games-list', (currentGames) => {
         // console.log("RESET GAME DATA ON JOIN ROOM");
         resetAllGameData();
 
-        joinRoom(currentGame.roomId);
+        joinRoom(
+          currentGame.publicRoomId || currentGame.roomId,
+          currentGame.roomId,
+          currentGame.publicRoomId,
+        );
       });
     });
 
@@ -463,29 +469,33 @@ socket.on('update-current-games-list', (currentGames) => {
   }
 });
 
-socket.on('auto-join-room-id', (roomId_, newRoomPassword) => {
+socket.on('auto-join-room-id', (roomId_, publicRoomId_, newRoomPassword) => {
   // Received a request from server to auto join and sit down.
   // This is called when we create a room.
-  socket.emit('join-room', roomId_, newRoomPassword);
+  socket.emit('join-room', publicRoomId_ || roomId_, newRoomPassword);
   socket.emit('join-game', roomId_);
   isSpectator = false;
   roomId = roomId_;
-  setRoomUrl(roomId_);
+  publicRoomId = publicRoomId_;
+  roomJoinRef = publicRoomId_ || roomId_;
+  setRoomUrl(roomJoinRef);
   // change the view to the room instead of lobby
   changeView();
 });
 
 socket.on('match-found-join-room', (data) => {
-  if (roomId !== undefined) {
+  if (roomJoinRef !== undefined) {
     leaveRoom();
   }
 
   resetAllGameData();
-  socket.emit('join-room', data.roomId);
+  socket.emit('join-room', data.publicRoomId || data.roomId);
 
   roomId = data.roomId;
+  publicRoomId = data.publicRoomId;
+  roomJoinRef = data.publicRoomId || data.roomId;
   isSpectator = false;
-  setRoomUrl(data.roomId);
+  setRoomUrl(roomJoinRef);
 
   changeView();
 });
@@ -637,7 +647,7 @@ socket.on('update-room-spectators', (spectatorUsernames) => {
   $('.spectator-count').text(spectatorUsernames.length);
 });
 
-socket.on('joinPassword', (roomId) => {
+socket.on('joinPassword', (roomRef) => {
   (async function getEmail() {
     const { value: inputPassword } = await swal({
       title: 'Type in the room password',
@@ -654,8 +664,10 @@ socket.on('joinPassword', (roomId) => {
 
     if (inputPassword) {
       // swal('Entered password: ' + inputPassword);
-      socket.emit('join-room', roomId, inputPassword);
+      socket.emit('join-room', roomRef, inputPassword);
     } else {
+      resetAllGameData();
+      setLobbyUrl();
       changeView();
     }
   })();
@@ -663,12 +675,14 @@ socket.on('joinPassword', (roomId) => {
 
 socket.on('changeView', (targetLocation) => {
   if (targetLocation === 'lobby') {
+    resetAllGameData();
     setLobbyUrl();
   }
   changeView();
 });
 
 socket.on('wrongRoomPassword', () => {
+  resetAllGameData();
   setLobbyUrl();
   swal({
     title: 'Incorrect password',
@@ -680,6 +694,12 @@ socket.on('wrongRoomPassword', () => {
 // this part at the moment only updates the max number of players in a game.
 socket.on('update-room-info', (data) => {
   roomInfoData = data;
+  roomId = data.roomId;
+  publicRoomId = data.publicRoomId;
+  roomJoinRef = data.publicRoomId || data.roomId;
+  if (roomJoinRef !== undefined) {
+    setRoomUrl(roomJoinRef);
+  }
   // data.maxNumPlayers
   $(
     '.gameInfoMaxPlayers'
@@ -703,6 +723,7 @@ socket.on('update-room-info', (data) => {
   $('.disableVoteHistory')[1].checked = data.disableVoteHistory;
   $('.listedInLobby')[0].checked = data.listedInLobby;
   $('.listedInLobby')[1].checked = data.listedInLobby;
+  $('#emptyRoomTTLMinutes').val(data.emptyRoomTTLMinutes);
 
   $('#startGameOptionsAnonymousMode')[0].checked =
     data.startSettings.anonymousMode;
