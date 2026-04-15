@@ -325,6 +325,31 @@ var userOptions = {
     },
   },
 
+  optionDisplayRoomPlayerCards: {
+    defaultValue: 'true',
+    onLoad() {
+      if (docCookies.getItem('optionDisplayRoomPlayerCards') === 'true') {
+        $('#option_display_room_player_cards')[0].checked = true;
+        updateRoomPlayerCards(true);
+      } else {
+        updateRoomPlayerCards(false);
+      }
+    },
+    initialiseEventListener() {
+      $('#option_display_room_player_cards')[0].addEventListener('click', () => {
+        const { checked } = $('#option_display_room_player_cards')[0];
+
+        updateRoomPlayerCards(checked);
+
+        docCookies.setItem(
+          'optionDisplayRoomPlayerCards',
+          checked.toString(),
+          Infinity
+        );
+      });
+    },
+  },
+
   optionDisplayUseOldGameIcons: {
     defaultValue: 'false',
     onLoad() {

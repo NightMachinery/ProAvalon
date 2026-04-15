@@ -318,6 +318,137 @@ p {
     /* border: 5px solid transparent; */
 }
 
+.playerCardGlow,
+.playerCardInset,
+.playerAvatarFrame,
+.playerStateBadges {
+    display: none;
+}
+
+#mainRoomBox.room-player-cards-enabled {
+    overflow: hidden;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerDiv {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 0.32rem;
+    width: var(--room-player-card-width, 150px);
+    height: var(--room-player-card-height, 118px);
+    max-width: none;
+    max-height: none;
+    padding: 0.55rem 0.6rem 0.6rem;
+    border-radius: 18px;
+    overflow: hidden;
+    transform: none;
+    background:
+            linear-gradient(180deg, rgba(255, 251, 241, 0.96), rgba(230, 217, 191, 0.93));
+    border: 1px solid rgba(123, 93, 57, 0.25);
+    box-shadow:
+            0 14px 28px rgba(46, 31, 16, 0.18),
+            inset 0 1px 0 rgba(255, 255, 255, 0.78);
+    text-align: center;
+    transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerDiv:hover {
+    transform: translateY(-2px);
+    box-shadow:
+            0 18px 34px rgba(46, 31, 16, 0.22),
+            inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+#mainRoomBox.room-player-cards-enabled .playerCardGlow,
+#mainRoomBox.room-player-cards-enabled .playerCardInset,
+#mainRoomBox.room-player-cards-enabled .playerStateBadges {
+    display: block;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerCardGlow {
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    top: -10%;
+    height: 44%;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(255, 237, 197, 0.95), rgba(255, 237, 197, 0));
+    filter: blur(16px);
+    opacity: 0.95;
+    pointer-events: none;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerCardInset {
+    position: absolute;
+    inset: 1px;
+    border-radius: inherit;
+    border: 1px solid rgba(255, 255, 255, 0.46);
+    pointer-events: none;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerAvatarFrame {
+    display: none;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerStateBadges {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.24rem;
+    width: 100%;
+    min-height: 1.3rem;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerStateBadge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.12rem 0.48rem;
+    border-radius: 999px;
+    background: rgba(87, 66, 43, 0.1);
+    border: 1px solid rgba(87, 66, 43, 0.14);
+    color: #5a4022;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+#mainRoomBox.room-player-cards-enabled .playerStateBadge-leader {
+    background: rgba(183, 134, 33, 0.18);
+    border-color: rgba(151, 112, 23, 0.25);
+    color: #7d5810;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerStateBadge-hammer {
+    background: rgba(141, 93, 42, 0.18);
+    border-color: rgba(119, 78, 38, 0.25);
+    color: #6a4020;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerStateBadge-claim {
+    background: rgba(29, 112, 108, 0.15);
+    border-color: rgba(25, 93, 90, 0.24);
+    color: #165553;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerStateBadge-team {
+    background: rgba(42, 83, 145, 0.16);
+    border-color: rgba(34, 68, 117, 0.24);
+    color: #1f4f8c;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerStateBadge-offline,
+#mainRoomBox.room-player-cards-enabled .playerStateBadge-danger {
+    background: rgba(120, 56, 42, 0.16);
+    border-color: rgba(96, 45, 34, 0.24);
+    color: #6c2f22;
+}
+
 .gunBefore {
     z-index: 2;
     position: absolute;
@@ -352,6 +483,20 @@ p {
     justify-content: center;
 }
 
+#mainRoomBox.room-player-cards-enabled .username-p {
+    position: relative !important;
+    z-index: 2;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    white-space: normal !important;
+    line-height: 1.08;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #3d2a19;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
 .avatarImgInRoom {
     /*margin: 0 auto;*/
     object-fit: contain;
@@ -362,6 +507,23 @@ p {
     top: 0px;
     margin-left: 2px;
 
+}
+
+#mainRoomBox.room-player-cards-enabled .avatarImgInRoom {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin-left: 0;
+    border-radius: 14px;
+    border: 1px solid rgba(88, 62, 35, 0.14);
+    object-fit: cover;
+    box-shadow:
+            0 8px 18px rgba(60, 40, 18, 0.16),
+            inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    background:
+            linear-gradient(180deg, rgba(247, 237, 216, 0.96), rgba(223, 204, 170, 0.96));
 }
 
 /* Highlighting/outlining of avatars/chat */
@@ -435,9 +597,37 @@ p {
     /*display: block;*/
 }
 
+#mainRoomBox.room-player-cards-enabled .avatarOptionButtons {
+    top: 10px;
+    right: 9px;
+    left: auto;
+    display: flex;
+    gap: 0.32rem;
+    z-index: 3;
+}
+
 .playerDiv:hover .avatarButton {
     display: block;
     /*background-color: purple;*/
+}
+
+#mainRoomBox.room-player-cards-enabled .playerDiv .avatarButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    transform: none;
+    border-radius: 999px;
+    border: 1px solid rgba(70, 47, 24, 0.14);
+    background: rgba(255, 251, 242, 0.86);
+    color: #573d23;
+    box-shadow: 0 3px 10px rgba(34, 23, 12, 0.12);
+}
+
+#mainRoomBox.room-player-cards-enabled .playerDiv:hover .avatarButton {
+    display: inline-flex;
 }
 
 /* Center well */
@@ -774,6 +964,11 @@ h3 {
     /* For IE8 and earlier */
 }
 
+#mainRoomBox.room-player-cards-enabled .leftRoom {
+    opacity: 0.58;
+    filter: saturate(0.55);
+}
+
 #claimButton {
     position: absolute;
     right: 0%;
@@ -854,6 +1049,16 @@ h3 {
     transform: translateX(-50%);
 }
 
+#mainRoomBox.room-player-cards-enabled .approveLabel,
+#mainRoomBox.room-player-cards-enabled .rejectLabel {
+    top: 8px;
+    padding: 0.22rem 0.58rem;
+    border-radius: 999px;
+    font-size: 0.64rem;
+    z-index: 4;
+    box-shadow: 0 6px 16px rgba(39, 24, 10, 0.16);
+}
+
 .rejectLabel {
     position: absolute;
     top: -10%;
@@ -874,6 +1079,157 @@ h3 {
     display: block;
     width: 16px;
     height: 16px;
+}
+
+#mainRoomBox.room-player-cards-enabled .cardsContainer {
+    position: relative;
+    right: auto;
+    transform: none;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.24rem;
+    width: 100%;
+    min-height: 1rem;
+    z-index: 2;
+}
+
+#mainRoomBox.room-player-cards-enabled .cardObject {
+    width: auto;
+    height: auto;
+}
+
+#mainRoomBox.room-player-cards-enabled .cardObjectChip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.12rem 0.48rem;
+    border-radius: 999px;
+    background: rgba(72, 61, 129, 0.12);
+    border: 1px solid rgba(72, 61, 129, 0.18);
+    color: #4a3b83;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+#mainRoomBox.room-player-cards-enabled .role-p {
+    position: relative;
+    z-index: 2;
+    margin: 0;
+    width: auto !important;
+    max-width: 100%;
+    padding: 0.14rem 0.48rem;
+    border-radius: 999px;
+    background: rgba(91, 72, 47, 0.11);
+    color: #60472a;
+    font-size: 0.66rem;
+    line-height: 1.15;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38);
+}
+
+#mainRoomBox.room-player-cards-enabled .highlight-avatar {
+    background:
+            linear-gradient(180deg, rgba(255, 250, 230, 0.98), rgba(240, 224, 182, 0.98)) !important;
+    border-color: rgba(189, 145, 45, 0.42);
+    box-shadow:
+            0 0 0 2px rgba(231, 192, 89, 0.48),
+            0 20px 34px rgba(60, 39, 15, 0.22);
+}
+
+#mainRoomBox.room-player-cards-enabled .highlight-participating {
+    background:
+            linear-gradient(180deg, rgba(255, 247, 214, 0.98), rgba(244, 228, 168, 0.98)) !important;
+}
+
+#mainRoomBox.room-player-cards-enabled .highlight-participating-dark {
+    background:
+            linear-gradient(180deg, rgba(111, 92, 24, 0.82), rgba(88, 72, 18, 0.92)) !important;
+}
+
+#mainRoomBox.room-player-cards-enabled .outline-leader {
+    box-shadow:
+            0 0 0 2px rgba(195, 72, 42, 0.42),
+            0 20px 34px rgba(60, 39, 15, 0.22);
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .playerDiv {
+    background:
+            linear-gradient(180deg, rgba(54, 43, 34, 0.98), rgba(31, 25, 21, 0.96));
+    border-color: rgba(158, 126, 87, 0.2);
+    box-shadow:
+            0 16px 32px rgba(0, 0, 0, 0.38),
+            inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .playerCardGlow {
+    background: radial-gradient(circle, rgba(166, 122, 63, 0.45), rgba(166, 122, 63, 0));
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .playerCardInset {
+    border-color: rgba(255, 243, 220, 0.08);
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .playerAvatarFrame {
+    background:
+            linear-gradient(180deg, rgba(147, 118, 79, 0.18), rgba(66, 46, 26, 0.34));
+    box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.06),
+            inset 0 -12px 18px rgba(0, 0, 0, 0.26);
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .avatarImgInRoom {
+    border-color: rgba(184, 151, 111, 0.14);
+    background:
+            linear-gradient(180deg, rgba(78, 62, 46, 0.95), rgba(53, 42, 30, 0.95));
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .username-p,
+.dark #mainRoomBox.room-player-cards-enabled .role-p,
+.dark #mainRoomBox.room-player-cards-enabled .playerStateBadge,
+.dark #mainRoomBox.room-player-cards-enabled .cardObjectChip,
+.dark #mainRoomBox.room-player-cards-enabled .playerDiv .avatarButton {
+    color: #f1e4cf;
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .playerStateBadge {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 236, 211, 0.08);
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .playerStateBadge-leader {
+    background: rgba(205, 161, 53, 0.18);
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .playerStateBadge-hammer {
+    background: rgba(173, 104, 58, 0.18);
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .playerStateBadge-claim {
+    background: rgba(43, 145, 141, 0.18);
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .playerStateBadge-team {
+    background: rgba(78, 131, 209, 0.2);
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .playerStateBadge-offline,
+.dark #mainRoomBox.room-player-cards-enabled .playerStateBadge-danger {
+    background: rgba(176, 79, 59, 0.22);
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .role-p {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .cardObjectChip {
+    background: rgba(118, 102, 197, 0.18);
+    border-color: rgba(184, 173, 237, 0.18);
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .playerDiv .avatarButton {
+    background: rgba(56, 46, 36, 0.92);
+    border-color: rgba(226, 207, 180, 0.08);
 }
 
 .whisper {

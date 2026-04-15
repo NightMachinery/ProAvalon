@@ -1,3 +1,13 @@
+function getPublicCardChipLabel(key) {
+  const labelByKey = {
+    lady: 'Lady',
+    ref: 'Ref',
+    sire: 'Sire',
+  };
+
+  return labelByKey[key] || icons[key].toolTip;
+}
+
 function runPublicDataAvalon(gameDataInc) {
   const gd = gameDataInc;
 
@@ -16,7 +26,11 @@ function runPublicDataAvalon(gameDataInc) {
     }
 
     // Reset cards container
-    $('.playerDiv').find('.cardsContainer')[0].innerHTML = '';
+    $('.playerDiv')
+      .find('.cardsContainer')
+      .each(function resetCardsContainer() {
+        this.innerHTML = '';
+      });
 
     // Draw cards:
     for (const key in gd.publicData.cards) {
@@ -29,7 +43,11 @@ function runPublicDataAvalon(gameDataInc) {
         const { index } = gd.publicData.cards[key];
 
         var card;
-        if (icons[key].iconType === 'bootstrapGlyphicon') {
+        if (isRoomPlayerCardsEnabled()) {
+          card = `<span class='cardObject cardObjectChip' title='${icons[key].toolTip}'>${escapeHtml(
+            getPublicCardChipLabel(key)
+          )}</span>`;
+        } else if (icons[key].iconType === 'bootstrapGlyphicon') {
           card = `<span data-toggle='tooltip' data-placement='left' title='${icons[key].toolTip}' class='cardObject glyphicon ${icons[key].glyph}' style=''></span> `;
         } else if (icons[key].iconType === 'base64') {
           card = `<img class="cardObject" data-toggle="tooltip" data-placement="left" title="${icons[key].toolTip}" src="${icons[key].glyph}" />`;
@@ -37,23 +55,45 @@ function runPublicDataAvalon(gameDataInc) {
           card = 'Undefined! Something went wrong.';
         }
 
-        const padding =
-          "<span class='cardObject glyphicon glyphicon-asterisk' style='visibility: hidden;'></span> ";
+        const padding = isRoomPlayerCardsEnabled()
+          ? ''
+          : "<span class='cardObject glyphicon glyphicon-asterisk' style='visibility: hidden;'></span> ";
 
-        $($('.playerDiv')[index]).find('.cardsContainer')[0].innerHTML += card;
-        $($('.playerDiv')[index]).find('.cardsContainer')[0].innerHTML +=
-          padding;
+        const playerCardContainer = $(getRoomPlayerDiv(index)).find(
+          '.cardsContainer'
+        )[0];
+        if (!playerCardContainer) {
+          continue;
+        }
+
+        playerCardContainer.innerHTML += card;
+        playerCardContainer.innerHTML += padding;
 
         // Initialise the tooltip.
-        $('.cardObject').tooltip();
+        if (isRoomPlayerCardsEnabled() === false) {
+          $('.cardObject').tooltip();
+        }
       }
     }
   }
 }
 
 function drawAssassinateIcon(indexOfPlayer) {
+  if (!getRoomPlayerDiv(indexOfPlayer)) {
+    return;
+  }
+
+  if (isRoomPlayerCardsEnabled()) {
+    $(getRoomPlayerDiv(indexOfPlayer))
+      .find('.playerStateBadges')
+      .append(
+        "<span class='playerStateBadge playerStateBadge-danger'>Shot</span>"
+      );
+    return;
+  }
+
   // set the div string and add the star\\
-  let str = $('#mainRoomBox div')[indexOfPlayer].innerHTML;
+  let str = getRoomPlayerDiv(indexOfPlayer).innerHTML;
 
   const darkModeEnabled = $('#option_display_dark_theme')[0].checked;
   const useBullet = $('#optionDisplayUseOldGameIcons')[0].checked;
@@ -70,7 +110,7 @@ function drawAssassinateIcon(indexOfPlayer) {
   str = `${str}<span><img class='assassinateIcon' src='${pics[icon].path}' style='${pics[icon].style}'></span>`;
 
   // update the str in the div
-  $('#mainRoomBox div')[indexOfPlayer].innerHTML = str;
+  getRoomPlayerDiv(indexOfPlayer).innerHTML = str;
 
   if (useBullet === false) {
     // var raiseBy = $(".assassinateIcon").height()*0.22;

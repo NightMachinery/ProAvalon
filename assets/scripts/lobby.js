@@ -117,6 +117,11 @@ let gameStarted = false;
 
 let isSpectator = false;
 
+const ROOM_PLAYER_CARD_PLACEHOLDER_PATHS = {
+  res: 'pictures/player-card-placeholder-res.svg',
+  spy: 'pictures/player-card-placeholder-spy.svg',
+};
+
 const DEFAULT_LISTED_EMPTY_ROOM_TTL_MINUTES = 10;
 const DEFAULT_UNLISTED_EMPTY_ROOM_TTL_MINUTES = 72 * 60;
 
@@ -189,6 +194,18 @@ function copyTextHttpSafe(text) {
 
 function isCurrentUserHost() {
   return roomInfoData && roomInfoData.isHost === true;
+}
+
+function isRoomPlayerCardsEnabled() {
+  return docCookies.getItem('optionDisplayRoomPlayerCards') === 'true';
+}
+
+function getRoomPlayerDivs() {
+  return document.querySelectorAll('#mainRoomBox > .playerDiv');
+}
+
+function getRoomPlayerDiv(index) {
+  return getRoomPlayerDivs()[index];
 }
 
 // window resize, repaint the users
@@ -386,17 +403,17 @@ function activateAvatarButtons() {
 }
 
 function drawVotes(votes) {
-  const divs = document.querySelectorAll('#mainRoomBox div');
+  const divs = getRoomPlayerDivs();
 
   if (votes) {
     for (var i = 0; i < divs.length; i++) {
       if (votes[i] === 'approve') {
-        $($('#mainRoomBox div')[i])
+        $(getRoomPlayerDiv(i))
           .find('.approveLabel')
           .removeClass('invisible');
       }
       if (votes[i] === 'reject') {
-        $($('#mainRoomBox div')[i])
+        $(getRoomPlayerDiv(i))
           .find('.rejectLabel')
           .removeClass('invisible');
       }
@@ -407,14 +424,14 @@ function drawVotes(votes) {
       // document.querySelectorAll("#mainRoomBox div")[i].classList.remove("approve");
       // document.querySelectorAll("#mainRoomBox div")[i].classList.remove("reject");
 
-      $($('#mainRoomBox div')[i]).find('.approveLabel').addClass('invisible');
-      $($('#mainRoomBox div')[i]).find('.rejectLabel').addClass('invisible');
+      $(getRoomPlayerDiv(i)).find('.approveLabel').addClass('invisible');
+      $(getRoomPlayerDiv(i)).find('.rejectLabel').addClass('invisible');
     }
   }
 }
 
 function enableSelectAvatars(prohibitedIndexesToPicks) {
-  const divs = document.querySelectorAll('#mainRoomBox div');
+  const divs = getRoomPlayerDivs();
   // add the event listeners for button press
   for (let i = 0; i < divs.length; i++) {
     if (
@@ -539,6 +556,10 @@ function drawAndPositionAvatars() {
 
   // set the divs into the box
   $('#mainRoomBox').html(str);
+  $('#mainRoomBox').toggleClass(
+    'room-player-cards-enabled',
+    isRoomPlayerCardsEnabled()
+  );
 
   //= ==============================================
   // POSITIONING SECTION
@@ -546,7 +567,12 @@ function drawAndPositionAvatars() {
 
   // set the positions and sizes
   // console.log("numPlayers: " + numPlayers)
-  const divs = document.querySelectorAll('#mainRoomBox div');
+  const divs = getRoomPlayerDivs();
+
+  if (isRoomPlayerCardsEnabled()) {
+    positionPlayerCards(divs, w, h);
+    return;
+  }
 
   let scaleWidthDown;
   if (numPlayers === 6) {
@@ -638,11 +664,89 @@ function drawAndPositionAvatars() {
   }
 }
 
+function positionPlayerCards(divs, w, h) {
+  const numPlayers = divs.length;
+  if (numPlayers === 0) {
+    return;
+  }
+
+  const horizontalPadding = Math.max(12, Math.min(32, w * 0.035));
+  const cardGap = Math.max(8, Math.min(18, w * 0.015));
+  const verticalPadding = Math.max(10, Math.min(24, h * 0.06));
+  const shouldUseTwoRows = numPlayers >= 5;
+  const rows = shouldUseTwoRows
+    ? [Math.ceil(numPlayers / 2), Math.floor(numPlayers / 2)]
+    : [numPlayers];
+  const maxRowCount = Math.max(...rows);
+
+  let cardWidth =
+    (w - horizontalPadding * 2 - cardGap * (maxRowCount - 1)) / maxRowCount;
+  cardWidth = Math.min(180, cardWidth);
+  cardWidth = Math.max(78, cardWidth);
+
+  let cardHeight = Math.min(150, cardWidth * 1.15);
+  if (shouldUseTwoRows) {
+    const targetMiddleGap = Math.max(52, Math.min(84, h * 0.24));
+    const maxCardHeightForRows =
+      (h - verticalPadding * 2 - targetMiddleGap) / 2;
+    cardHeight = Math.min(cardHeight, maxCardHeightForRows);
+  } else {
+    cardHeight = Math.min(cardHeight, h - verticalPadding * 2);
+  }
+  cardHeight = Math.max(82, cardHeight);
+
+  $('#mainRoomBox').css('--room-player-card-width', `${cardWidth}px`);
+  $('#mainRoomBox').css('--room-player-card-height', `${cardHeight}px`);
+
+  let playerIndex = 0;
+  rows.forEach((rowCount, rowIndex) => {
+    if (rowCount <= 0) {
+      return;
+    }
+
+    const rowWidth = rowCount * cardWidth + (rowCount - 1) * cardGap;
+    const startLeft = (w - rowWidth) / 2;
+    const rowBottom = shouldUseTwoRows
+      ? rowIndex === 0
+        ? h - verticalPadding - cardHeight
+        : verticalPadding
+      : (h - cardHeight) / 2;
+
+    for (let i = 0; i < rowCount; i++) {
+      const div = divs[playerIndex];
+      if (!div) {
+        playerIndex++;
+        continue;
+      }
+
+      div.style.left = `${startLeft + i * (cardWidth + cardGap)}px`;
+      div.style.bottom = `${rowBottom}px`;
+      div.style.width = `${cardWidth}px`;
+      div.style.height = `${cardHeight}px`;
+      div.style.transform = '';
+
+      playerIndex++;
+    }
+  });
+}
+
 let lastPickNum = 0;
 let lastMissionNum = 0;
 function drawGuns() {
-  $('.gun img').css('width', `${$('#mainRoomBox div').width()}px`);
-  $('.gun').css('width', `${$('#mainRoomBox div').width()}px`);
+  if (isRoomPlayerCardsEnabled()) {
+    $('.gun').css('visibility', 'hidden');
+    $('.gun').removeClass('gunAfter');
+    $('.gun').addClass('gunBefore');
+    return;
+  }
+
+  if (!getRoomPlayerDiv(0)) {
+    return;
+  }
+
+  $('.gun').css('visibility', '');
+  $('.gun img').css('width', `${$(getRoomPlayerDiv(0)).width()}px`);
+  $('.gun').css('width', `${$(getRoomPlayerDiv(0)).width()}px`);
 
   if (gameData && gameData.phase) {
     if (gameData.toShowGuns === false) {
@@ -696,16 +800,12 @@ function drawGuns() {
         $($('.gun')[i]).animate(
           {
             top: `${$(
-              $('#mainRoomBox div')[
-              getIndexFromUsername(gameData.proposedTeam[i])
-              ]
+              getRoomPlayerDiv(getIndexFromUsername(gameData.proposedTeam[i]))
             ).position().top +
               heightOfGun * offsetGunPos.y
               }px`,
             left: `${$(
-              $('#mainRoomBox div')[
-              getIndexFromUsername(gameData.proposedTeam[i])
-              ]
+              getRoomPlayerDiv(getIndexFromUsername(gameData.proposedTeam[i]))
             ).position().left +
               widOfGun / offsetGunPos.x
               }px`,
@@ -725,6 +825,10 @@ function drawGuns() {
 }
 
 function adjustGunPositions() {
+  if (isRoomPlayerCardsEnabled()) {
+    return;
+  }
+
   if (gameData && gameData.proposedTeam) {
     for (let i = 0; i < gameData.proposedTeam.length; i++) {
       const widOfGun = $('.gun').width();
@@ -745,9 +849,7 @@ function adjustGunPositions() {
       $($('.gun')[i]).css(
         'top',
         `${$(
-          $('#mainRoomBox div')[
-          getIndexFromUsername(gameData.proposedTeam[i])
-          ]
+          getRoomPlayerDiv(getIndexFromUsername(gameData.proposedTeam[i]))
         ).position().top +
         heightOfGun * offsetGunPos.y
         }px`
@@ -755,9 +857,7 @@ function adjustGunPositions() {
       $($('.gun')[i]).css(
         'left',
         `${$(
-          $('#mainRoomBox div')[
-          getIndexFromUsername(gameData.proposedTeam[i])
-          ]
+          getRoomPlayerDiv(getIndexFromUsername(gameData.proposedTeam[i]))
         ).position().left +
         widOfGun / offsetGunPos.x
         }px`
@@ -767,6 +867,10 @@ function adjustGunPositions() {
 }
 
 function drawTeamLeader() {
+  if (isRoomPlayerCardsEnabled()) {
+    return;
+  }
+
   let playerIndex;
   if (gameStarted === false) {
     playerIndex = 0;
@@ -774,8 +878,8 @@ function drawTeamLeader() {
     playerIndex = gameData.teamLeader;
   }
   // set the div string and add the star
-  if ($('#mainRoomBox div')[playerIndex]) {
-    let str = $('#mainRoomBox div')[playerIndex].innerHTML;
+  if (getRoomPlayerDiv(playerIndex)) {
+    let str = getRoomPlayerDiv(playerIndex).innerHTML;
 
     let icon;
     if ($('#optionDisplayUseOldGameIcons')[0].checked === true) {
@@ -790,7 +894,7 @@ function drawTeamLeader() {
 
     str = `${str}<img class='leaderIcon' src='${pics[icon].path}' style='${pics[icon].style}'>`;
     // update the str in the div
-    $('#mainRoomBox div')[playerIndex].innerHTML = str;
+    getRoomPlayerDiv(playerIndex).innerHTML = str;
   }
 }
 
@@ -804,18 +908,16 @@ function drawClaimingPlayers(claimingPlayers) {
 
   for (let i = 0; i < roomPlayersData.length; i++) {
     if (roomPlayersData[i].claim && roomPlayersData[i].claim === true) {
-      if (
-        $('#mainRoomBox div')[getIndexFromUsername(roomPlayersData[i].username)]
-      ) {
+      if (isRoomPlayerCardsEnabled() === false && getRoomPlayerDiv(
+        getIndexFromUsername(roomPlayersData[i].username)
+      )) {
         let str =
-          $('#mainRoomBox div')[
-            getIndexFromUsername(roomPlayersData[i].username)
-          ].innerHTML;
+          getRoomPlayerDiv(getIndexFromUsername(roomPlayersData[i].username))
+            .innerHTML;
         str += "<span><img src='pictures/claim.png' class='claimIcon'></span>";
         // update the str in the div
-        $('#mainRoomBox div')[
-          getIndexFromUsername(roomPlayersData[i].username)
-        ].innerHTML = str;
+        getRoomPlayerDiv(getIndexFromUsername(roomPlayersData[i].username))
+          .innerHTML = str;
 
         // $(".claimIcon")[0].style.top = $("#mainRoomBox div")[playerIndex].style.width;
       }
@@ -836,6 +938,21 @@ function drawExitedPlayers(playersStillInRoom) {
   for (var i = 0; i < arrayOfUsernames.length; i++) {
     // if(roomPlayersData[i].claim && roomPlayersData[i].claim === true){
     if (playersStillInRoom.indexOf(arrayOfUsernames[i]) === -1) {
+      if (getRoomPlayerDiv(getIndexFromUsername(arrayOfUsernames[i]))) {
+        getRoomPlayerDiv(getIndexFromUsername(arrayOfUsernames[i])).classList.add(
+          'leftRoom'
+        );
+
+        if (
+          isRoomPlayerCardsEnabled() &&
+          $(getRoomPlayerDiv(getIndexFromUsername(arrayOfUsernames[i])))
+            .find('.playerStateBadge-offline').length === 0
+        ) {
+          $(getRoomPlayerDiv(getIndexFromUsername(arrayOfUsernames[i])))
+            .find('.playerStateBadges')
+            .append(buildPlayerStateBadge('Away', 'offline'));
+        }
+      }
       if ($('.avatarImgInRoom')[getIndexFromUsername(arrayOfUsernames[i])]) {
         $('.avatarImgInRoom')[
           getIndexFromUsername(arrayOfUsernames[i])
@@ -844,6 +961,15 @@ function drawExitedPlayers(playersStillInRoom) {
     } else if (
       $('.avatarImgInRoom')[getIndexFromUsername(arrayOfUsernames[i])]
     ) {
+      if (getRoomPlayerDiv(getIndexFromUsername(arrayOfUsernames[i]))) {
+        getRoomPlayerDiv(getIndexFromUsername(arrayOfUsernames[i])).classList.remove(
+          'leftRoom'
+        );
+
+        $(getRoomPlayerDiv(getIndexFromUsername(arrayOfUsernames[i])))
+          .find('.playerStateBadge-offline')
+          .remove();
+      }
       $('.avatarImgInRoom')[
         getIndexFromUsername(arrayOfUsernames[i])
       ].classList.remove('leftRoom');
@@ -996,7 +1122,7 @@ function checkEntryExistsInArray(array, entry) {
 }
 
 function countHighlightedAvatars() {
-  const divs = document.querySelectorAll('#mainRoomBox div');
+  const divs = getRoomPlayerDivs();
   let count = 0;
   for (let i = 0; i < divs.length; i++) {
     if (divs[i].classList.contains('highlight-avatar') === true) {
@@ -1009,7 +1135,7 @@ function countHighlightedAvatars() {
 function getHighlightedAvatars() {
   let str = '';
 
-  const divs = document.querySelectorAll('#mainRoomBox div');
+  const divs = getRoomPlayerDivs();
 
   const arr = [];
 
@@ -1027,7 +1153,7 @@ function getHighlightedAvatars() {
 
 function restoreHighlightedAvatars(usernames) {
   usernames.forEach((username) => {
-    $($('#mainRoomBox div')[getIndexFromUsername(username)]).addClass(
+    $(getRoomPlayerDiv(getIndexFromUsername(username))).addClass(
       'highlight-avatar'
     );
   });
@@ -1053,26 +1179,35 @@ function getUsernameFromIndex(index) {
   return false;
 }
 
+function buildPlayerStateBadge(label, modifier) {
+  return `<span class='playerStateBadge playerStateBadge-${modifier}'>${escapeHtml(
+    label
+  )}</span>`;
+}
+
 function strOfAvatar(playerData, alliance) {
-  let picLink;
-  if (alliance === 'res') {
-    if (
-      playerData.avatarImgRes &&
-      $('#option_display_original_avatars')[0].checked === false &&
-      (!playerData.avatarHide || playerData.avatarHide === false)
-    ) {
-      picLink = playerData.avatarImgRes
-    } else {
-      picLink = 'avatars/base-res.svg';
-    }
+  const cardModeEnabled = isRoomPlayerCardsEnabled();
+  const useOriginalAvatars =
+    $('#option_display_original_avatars')[0].checked === true;
+  const hasVisibleCustomAvatar = !playerData.avatarHide;
+  let picLink =
+    ROOM_PLAYER_CARD_PLACEHOLDER_PATHS[alliance] ||
+    ROOM_PLAYER_CARD_PLACEHOLDER_PATHS.res;
+
+  if (useOriginalAvatars === true) {
+    picLink = alliance === 'spy' ? 'avatars/base-spy.svg' : 'avatars/base-res.svg';
   } else if (
+    alliance === 'res' &&
+    playerData.avatarImgRes &&
+    hasVisibleCustomAvatar
+  ) {
+    picLink = playerData.avatarImgRes;
+  } else if (
+    alliance === 'spy' &&
     playerData.avatarImgSpy &&
-    $('#option_display_original_avatars')[0].checked === false &&
-    (!playerData.avatarHide || playerData.avatarHide === false)
+    hasVisibleCustomAvatar
   ) {
     picLink = playerData.avatarImgSpy;
-  } else {
-    picLink = 'avatars/base-spy.svg';
   }
 
   // add in the role of the player, and the percy info
@@ -1090,20 +1225,25 @@ function strOfAvatar(playerData, alliance) {
         gameData.see.roles[getIndexFromUsername(playerData.username)]
       ).width + 20;
 
-    role = `<p class='role-p' style='width: ${roleWid}px; margin: auto;'>${gameData.see.roles[getIndexFromUsername(playerData.username)]
-      }</p>`;
+    role = `<p class='role-p' style='width: ${roleWid}px; margin: auto;'>${escapeHtml(
+      gameData.see.roles[getIndexFromUsername(playerData.username)]
+    )}</p>`;
   } else if (gameStarted === true && gameData !== undefined) {
     // if rendering our own player, give it the role tag
     if (playerData.username === gameData.username) {
       var roleWid = ctx.measureText(gameData.role).width + 20;
-      role = `<p class='role-p' style='width: ${roleWid}px; margin: auto;'>${gameData.role}</p>`;
+      role = `<p class='role-p' style='width: ${roleWid}px; margin: auto;'>${escapeHtml(
+        gameData.role
+      )}</p>`;
     } else if (gameData.see && gameData.see.roleTags) {
       for (const username in gameData.see.roleTags) {
         const roleTag = gameData.see.roleTags[username];
 
         if (playerData.username === username) {
           var roleWid = ctx.measureText(roleTag).width + 20;
-          role = `<p class='role-p' style='width: ${roleWid}px; margin: auto;'>${roleTag}</p>`;
+          role = `<p class='role-p' style='width: ${roleWid}px; margin: auto;'>${escapeHtml(
+            roleTag
+          )}</p>`;
         }
       }
     }
@@ -1119,7 +1259,8 @@ function strOfAvatar(playerData, alliance) {
   const nameWid = ctx.measureText(playerData.username).width;
   // console.log(nameWid);
 
-  const widOfBox = $('#mainRoomBox div').width();
+  const firstPlayerDiv = getRoomPlayerDiv(0);
+  const widOfBox = firstPlayerDiv ? $(firstPlayerDiv).width() : 0;
   // console.log(widOfBox);
 
   const littleProtrudingEdgeWid = (nameWid - widOfBox) / 2;
@@ -1130,7 +1271,7 @@ function strOfAvatar(playerData, alliance) {
     searchTerm = 'hammer-dark';
   }
 
-  if (gameStarted === false) {
+  if (cardModeEnabled === false && gameStarted === false) {
     // give hammer star to the host
     if (playerData.username === getUsernameFromIndex(0)) {
       hammerStar =
@@ -1138,11 +1279,56 @@ function strOfAvatar(playerData, alliance) {
         `<img style='width: 16px; height: 16px;' data-toggle='tooltip' data-placement='left' title='${icons[searchTerm].toolTip}' src=${icons[searchTerm].glyph}>` +
         '</span>';
     }
-  } else if (playerData.username === getUsernameFromIndex(gameData.hammer)) {
+  } else if (
+    cardModeEnabled === false &&
+    gameData &&
+    playerData.username === getUsernameFromIndex(gameData.hammer)
+  ) {
     hammerStar =
       `<span class='hammerSpan' style='position: absolute; left: ${offsetDist}px; bottom: 2px;'>` +
       `<img style='width: 16px; height: 16px;' data-toggle='tooltip' data-placement='left' title='${icons[searchTerm].toolTip}' src=${icons[searchTerm].glyph}>` +
       '</span>';
+  }
+
+  let playerStateBadges = '';
+  if (cardModeEnabled === true) {
+    const stateBadges = [];
+    const isCurrentLeader =
+      gameStarted === false
+        ? playerData.username === getUsernameFromIndex(0)
+        : gameData &&
+          playerData.username === getUsernameFromIndex(gameData.teamLeader);
+    const isHammerHolder =
+      gameStarted === true &&
+      gameData &&
+      playerData.username === getUsernameFromIndex(gameData.hammer);
+    const isOnCurrentTeam =
+      gameStarted === true &&
+      gameData &&
+      gameData.proposedTeam &&
+      gameData.proposedTeam.indexOf(playerData.username) !== -1;
+
+    if (isCurrentLeader) {
+      stateBadges.push(buildPlayerStateBadge('Leader', 'leader'));
+    }
+    if (isHammerHolder) {
+      stateBadges.push(buildPlayerStateBadge('Hammer', 'hammer'));
+    }
+    if (playerData.claim === true) {
+      stateBadges.push(buildPlayerStateBadge('Claim', 'claim'));
+    }
+    if (isOnCurrentTeam) {
+      stateBadges.push(buildPlayerStateBadge('Team', 'team'));
+    }
+    if (playerData.disconnected === true) {
+      stateBadges.push(buildPlayerStateBadge('Away', 'offline'));
+    }
+
+    playerStateBadges = `<span class='playerStateBadges'>${stateBadges.join(
+      ''
+    )}</span>`;
+  } else {
+    playerStateBadges = "<span class='playerStateBadges'></span>";
   }
 
   let selectedAvatar = '';
@@ -1165,25 +1351,35 @@ function strOfAvatar(playerData, alliance) {
     colourToHighlightChatButton = '';
   }
 
-  let str = `<div usernameofplayer='${playerData.username}' ${playerData.anonUsername ? `anonusernameofplayer=${playerData.anonUsername}` : ''} class='playerDiv ${selectedAvatar} ${
+  const escapedUsername = escapeHtml(playerData.username);
+  const escapedAnonUsername = playerData.anonUsername
+    ? `anonusernameofplayer='${escapeHtml(playerData.anonUsername)}'`
+    : '';
+  const usernameTextClass = cardModeEnabled
+    ? 'username-p username-p-card'
+    : 'username-p';
+
+  let str = `<div usernameofplayer='${escapedUsername}' ${escapedAnonUsername} class='playerDiv ${selectedAvatar} ${
     playerData.disconnected === true ? 'leftRoom' : ''
-  }''>`;
+  }'>`;
 
   str += "<span class='avatarOptionButtons'>";
   str +=
     "<span id='highlightAvatarButton' class='glyphicon glyphicon-user avatarButton'></span>";
   str += `<span id='highlightChatButton' style='background-color: ${colourToHighlightChatButton};' class='glyphicon glyphicon glyphicon-menu-hamburger avatarButton'></span>`;
   str += '</span>';
+  str += playerStateBadges;
 
   str +=
     '<span class="label label-success invisible approveLabel">Approve</span>';
   str += '<span class="label label-danger invisible rejectLabel">Reject</span>';
+  str += "<span class='playerCardGlow'></span>";
+  str += "<span class='playerCardInset'></span>";
+  str += "<span class='playerAvatarFrame'></span>";
   str += '<span class="cardsContainer"></span>';
 
-  str += `<img class='avatarImgInRoom' src='${picLink}'>`;
-  str += `${"<p class='username-p' style='white-space:nowrap; position:relative;'>" +
-    ' '
-    }${playerData.username} ${hammerStar} </p>${role}</div>`;
+  str += `<img class='avatarImgInRoom' src='${picLink}' alt='${escapedUsername}'>`;
+  str += `<p class='${usernameTextClass}'> ${escapedUsername} ${hammerStar} </p>${role}</div>`;
 
   return str;
 }
@@ -1840,6 +2036,14 @@ function updateTwoTabs(checked) {
   }
 }
 
+function updateRoomPlayerCards(checked) {
+  $('#mainRoomBox').toggleClass('room-player-cards-enabled', checked === true);
+
+  if (roomPlayersData) {
+    draw();
+  }
+}
+
 function unescapeHtml(unsafe) {
   return unsafe
     .replace(/&amp;/g, '&')
@@ -1879,6 +2083,12 @@ function scaleGameComponents() {
     'transform',
     `translateX(-50%) scale(${ratioToReduce})`
   );
+
+  if (isRoomPlayerCardsEnabled()) {
+    $('.approveLabel').css('transform', 'translateX(-50%)');
+    $('.rejectLabel').css('transform', 'translateX(-50%)');
+    return;
+  }
 
   // Scale the guns/pick icon
   const playerDivHeightRatio = $('.playerDiv').height() / 128;
