@@ -83,3 +83,8 @@ A follow-up room-layout pass tightens a few edge cases from the first polish rel
 - mobile player cards use a narrower centered max width instead of stretching too wide
 - Resistance cards now use stronger contrast against the light room background
 - card top controls reserve more space so badges and action icons do not collide
+- desktop room height budgeting now treats the avatar-area preference as board height and adds chrome height on top
+- avatar highlight-cycle buttons now stop event bubbling and render stronger visible selected states
+- timer and player-count badges now explicitly reset the old absolute-position rules so mobile and desktop room bars can lay them out normally
+- desktop room sizing now enforces a one-row minimum board budget for modern cards instead of allowing the chrome to consume that space
+- the light room board is a bit grayer, Resistance cards are bluer, and Spy cards are tuned to the same visual intensity band

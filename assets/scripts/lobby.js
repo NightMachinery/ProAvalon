@@ -45,9 +45,35 @@ function syncGamePaneLayout() {
       docCookies.getItem('optionDisplayHeightOfAvatarContainer'),
       10
     );
-    if (!Number.isNaN(storedHeight) && storedHeight > 0) {
-      $('#div1Resize').height(storedHeight);
-    }
+    const rootStyles = window.getComputedStyle(document.documentElement);
+    const cardHeight =
+      parseFloat(rootStyles.getPropertyValue('--room-player-card-height')) ||
+      168;
+    const roomPadding =
+      parseFloat(rootStyles.getPropertyValue('--space-xl')) * 2 || 48;
+    const missionTrackReserve = 76;
+    const minimumBoardHeight = Math.ceil(
+      cardHeight + roomPadding + missionTrackReserve
+    );
+    const roomContainer = document.querySelector('.room-container');
+    const roomGap = roomContainer
+      ? parseFloat(
+          window.getComputedStyle(roomContainer).rowGap ||
+            window.getComputedStyle(roomContainer).gap ||
+            '0'
+        ) || 0
+      : 0;
+    const topBarHeight = $('.roomInfoBar:visible').outerHeight(true) || 0;
+    const bottomBarHeight = $('.roomHeaderButtons:visible').outerHeight(true) || 0;
+    const requestedBoardHeight =
+      !Number.isNaN(storedHeight) && storedHeight > 0 ? storedHeight : 260;
+    const boardHeight = Math.max(requestedBoardHeight, minimumBoardHeight);
+    const desktopRoomHeight = Math.max(
+      410,
+      boardHeight + topBarHeight + bottomBarHeight + roomGap * 2
+    );
+
+    $('#div1Resize').height(desktopRoomHeight);
   }
 
   $('#div2Resize').height(
@@ -366,25 +392,26 @@ function activateAvatarButtons() {
   // console.log("LOL");
   // if(OPTION THING ADD HERE){
   const highlightButtons = document.querySelectorAll(
-    '#mainRoomBox div #highlightAvatarButton'
+    '#mainRoomBox .avatarButton--highlight-player'
   );
   // add the event listeners for button press
 
   // console.log("added " + highlightButtons.length + " many listeners for highlightbuttons");
 
   for (var i = 0; i < highlightButtons.length; i++) {
-    // console.log(i);
+    highlightButtons[i].addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
 
-    highlightButtons[i].addEventListener('click', function () {
-      // //toggle the highlight class
-      // var divs = document.querySelectorAll("#mainRoomBox div");
-      // var uniqueNum = i;
-      // console.log("click for highlight avatar");
+      const playerDiv = this.closest('.playerDiv');
+      if (!playerDiv) {
+        return;
+      }
 
-      // this.parentElement.classList.toggle("selected-avatar");
-      const username =
-        this.parentElement.parentElement.getAttribute('usernameofplayer');
-      // console.log("username: " + username);
+      const username = playerDiv.getAttribute('usernameofplayer');
+      if (!username) {
+        return;
+      }
 
       if (selectedAvatars[username] !== undefined) {
         selectedAvatars[username] += 1;
@@ -394,24 +421,26 @@ function activateAvatarButtons() {
 
       selectedAvatars[username] =
         selectedAvatars[username] % (numOfStatesOfHighlight + 1);
-      // console.log("Selected avatars num: " + selectedAvatars[username])
       draw();
     });
   }
 
   const highlightChatButtons = document.querySelectorAll(
-    '#mainRoomBox div #highlightChatButton'
+    '#mainRoomBox .avatarButton--highlight-chat'
   );
   // add the event listeners for button press
   for (var i = 0; i < highlightChatButtons.length; i++) {
-    highlightChatButtons[i].addEventListener('click', function () {
-      // //toggle the highlight class
-      // console.log("click for highlight chat");
+    highlightChatButtons[i].addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
 
-      const username =
-        this.parentElement.parentElement.getAttribute('usernameofplayer');
-      const anonUsername =
-        this.parentElement.parentElement.getAttribute('anonusernameofplayer');
+      const playerDiv = this.closest('.playerDiv');
+      if (!playerDiv) {
+        return;
+      }
+
+      const username = playerDiv.getAttribute('usernameofplayer');
+      const anonUsername = playerDiv.getAttribute('anonusernameofplayer');
       const chatItems = $(`.room-chat-list li span[username='${username}']${anonUsername ? `, .room-chat-list li span[username='${anonUsername}']` : ''}`);
 
       let playerHighlightColour = docCookies.getItem(
@@ -741,7 +770,9 @@ function positionPlayerCards(divs, w, h) {
   cardHeight = Math.max(140, cardHeight);
 
   const maxGridWidth = columns * cardWidth + Math.max(columns - 1, 0) * cardGap;
+  const singleRow = rowCount === 1;
 
+  $('#mainRoomBox').toggleClass('room-cards-single-row', singleRow);
   $('#mainRoomBox').css('--room-grid-columns', `${columns}`);
   $('#mainRoomBox').css('--room-grid-max-width', `${maxGridWidth}px`);
   $('#mainRoomBox').css('--room-player-card-width', `${cardWidth}px`);

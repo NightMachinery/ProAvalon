@@ -157,7 +157,13 @@
   max-width: min(100%, var(--room-grid-max-width));
   margin: 0 auto;
   padding: var(--space-xl);
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+#mainRoomBox.room-layout-desktop.room-layout-modern.room-cards-single-row {
+  align-content: center;
+  overflow-y: hidden;
 }
 
 #mainRoomBox.room-layout-desktop.room-layout-modern .playerDiv {
@@ -193,17 +199,17 @@
   --player-card-ink: #173b73;
   --player-card-line: rgba(59, 130, 246, 0.24);
   --player-card-highlight-line: rgba(255, 255, 255, 0.7);
-  background: linear-gradient(180deg, rgba(244, 248, 255, 0.99) 0%, rgba(232, 240, 255, 0.98) 58%, rgba(217, 229, 248, 0.98) 100%);
-  border-color: rgba(59, 130, 246, 0.2);
+  background: linear-gradient(180deg, rgba(221, 235, 255, 0.995) 0%, rgba(197, 218, 255, 0.985) 58%, rgba(177, 202, 244, 0.985) 100%);
+  border-color: rgba(59, 130, 246, 0.22);
 }
 
 #mainRoomBox.room-player-cards-enabled .playerDiv.playerAlliance-spy {
   --player-card-accent-rgb: 220, 38, 38;
   --player-card-ink: #6e1e1e;
-  --player-card-line: rgba(220, 38, 38, 0.18);
+  --player-card-line: rgba(220, 38, 38, 0.24);
   --player-card-highlight-line: rgba(255, 255, 255, 0.7);
-  background: linear-gradient(180deg, rgba(255, 247, 247, 0.99) 0%, rgba(246, 231, 231, 0.98) 58%, rgba(237, 216, 216, 0.98) 100%);
-  border-color: rgba(220, 38, 38, 0.16);
+  background: linear-gradient(180deg, rgba(255, 227, 227, 0.995) 0%, rgba(246, 206, 206, 0.985) 58%, rgba(234, 188, 188, 0.985) 100%);
+  border-color: rgba(220, 38, 38, 0.22);
 }
 
 #mainRoomBox.room-player-cards-enabled .playerDiv:hover {
@@ -379,13 +385,13 @@
 }
 
 .dark #mainRoomBox.room-player-cards-enabled .playerDiv.playerAlliance-res {
-  background: linear-gradient(180deg, rgba(29, 43, 66, 0.98), rgba(24, 37, 58, 0.98) 60%, rgba(18, 28, 46, 0.98));
-  border-color: rgba(96, 165, 250, 0.22);
+  background: linear-gradient(180deg, rgba(35, 54, 86, 0.98), rgba(28, 44, 72, 0.98) 60%, rgba(21, 35, 58, 0.98));
+  border-color: rgba(96, 165, 250, 0.24);
 }
 
 .dark #mainRoomBox.room-player-cards-enabled .playerDiv.playerAlliance-spy {
-  background: linear-gradient(180deg, rgba(64, 34, 34, 0.98), rgba(52, 28, 28, 0.98) 60%, rgba(39, 21, 21, 0.98));
-  border-color: rgba(248, 113, 113, 0.18);
+  background: linear-gradient(180deg, rgba(84, 42, 42, 0.98), rgba(70, 35, 35, 0.98) 60%, rgba(53, 26, 26, 0.98));
+  border-color: rgba(248, 113, 113, 0.22);
 }
 
 .dark #mainRoomBox.room-player-cards-enabled .playerCardGlow {

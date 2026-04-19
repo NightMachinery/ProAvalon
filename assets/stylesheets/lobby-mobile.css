@@ -397,8 +397,9 @@
     left: auto;
     right: auto;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
+    grid-template-columns: auto auto;
+    align-items: start;
+    justify-content: space-between;
     padding: var(--space-sm) var(--space-md);
     border-radius: var(--radius-md);
     background: var(--surface-overlay);
@@ -412,23 +413,29 @@
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: max-content;
-    flex: 0 0 auto;
+    align-items: center;
     justify-content: end;
     gap: var(--space-xs);
-    margin-left: 0;
+    margin-left: auto;
+    width: auto;
+    min-width: max-content;
   }
 
   .room-layout-mobile .roomInfoBadges .badge-game,
   .room-layout-mobile .roomInfoBadges .badge {
+    display: inline-flex !important;
     min-width: 3.5rem;
+    width: max-content;
     padding: 0.28rem 0.55rem;
-    background: var(--surface-base);
-    color: var(--text-primary);
+    background: var(--surface-base) !important;
+    color: var(--text-primary) !important;
     border-color: var(--border-default);
+    visibility: visible !important;
+    opacity: 1 !important;
   }
 
   .room-layout-mobile #claimButton {
-    flex: 0 1 auto;
+    flex: 0 0 auto;
     min-height: 2.25rem;
     justify-self: start;
   }
@@ -468,15 +475,15 @@
   }
 
   #mainRoomBox.room-layout-mobile .playerDiv {
-    width: min(100%, 22rem);
-    max-width: 22rem;
+    width: min(100%, 21.25rem);
+    max-width: 21.25rem;
   }
 
   #mainRoomBox.room-layout-mobile .avatarOptionButtons {
-    top: var(--space-md);
-    right: var(--space-md);
+    top: 0.7rem;
+    right: 0.7rem;
     left: auto;
-    gap: var(--space-sm);
+    gap: 0.35rem;
     opacity: 1;
   }
 
@@ -554,7 +561,7 @@
 
   .room-layout-mobile .roomInfoBadges {
     justify-content: start;
-    grid-auto-flow: column;
+    margin-left: 0;
   }
 
   .room-layout-mobile .roomHeaderButtons {
