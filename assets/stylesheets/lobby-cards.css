@@ -122,8 +122,8 @@
 
 /* === 2026 lobby + room polish overrides === */
 :root {
-  --room-player-card-width: 152px;
-  --room-player-card-height: 160px;
+  --room-player-card-width: 154px;
+  --room-player-card-height: 168px;
   --room-grid-max-width: 860px;
 }
 
@@ -152,7 +152,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  align-content: center;
+  align-content: flex-start;
   gap: var(--room-player-card-gap);
   max-width: min(100%, var(--room-grid-max-width));
   margin: 0 auto;
@@ -181,7 +181,7 @@
 
 #mainRoomBox.room-player-cards-enabled .playerDiv {
   gap: var(--space-xs);
-  padding: var(--space-md) var(--space-md) calc(var(--space-md) - 0.05rem);
+  padding: 3.15rem var(--space-md) calc(var(--space-md) - 0.05rem);
   border-radius: 12px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 249, 251, 0.98) 58%, rgba(241, 243, 247, 0.98) 100%);
   border: 1px solid var(--border-subtle);
@@ -191,15 +191,19 @@
 #mainRoomBox.room-player-cards-enabled .playerDiv.playerAlliance-res {
   --player-card-accent-rgb: 59, 130, 246;
   --player-card-ink: #173b73;
-  --player-card-line: rgba(59, 130, 246, 0.16);
+  --player-card-line: rgba(59, 130, 246, 0.24);
   --player-card-highlight-line: rgba(255, 255, 255, 0.7);
+  background: linear-gradient(180deg, rgba(244, 248, 255, 0.99) 0%, rgba(232, 240, 255, 0.98) 58%, rgba(217, 229, 248, 0.98) 100%);
+  border-color: rgba(59, 130, 246, 0.2);
 }
 
 #mainRoomBox.room-player-cards-enabled .playerDiv.playerAlliance-spy {
   --player-card-accent-rgb: 220, 38, 38;
   --player-card-ink: #6e1e1e;
-  --player-card-line: rgba(220, 38, 38, 0.16);
+  --player-card-line: rgba(220, 38, 38, 0.18);
   --player-card-highlight-line: rgba(255, 255, 255, 0.7);
+  background: linear-gradient(180deg, rgba(255, 247, 247, 0.99) 0%, rgba(246, 231, 231, 0.98) 58%, rgba(237, 216, 216, 0.98) 100%);
+  border-color: rgba(220, 38, 38, 0.16);
 }
 
 #mainRoomBox.room-player-cards-enabled .playerDiv:hover {
@@ -222,21 +226,22 @@
 }
 
 #mainRoomBox.room-player-cards-enabled .playerStateBadges {
-  top: var(--space-md);
-  left: var(--space-md);
-  gap: 0.3rem;
-  width: calc(100% - 5.25rem);
+  top: 0.65rem;
+  left: 0.65rem;
+  gap: 0.24rem;
+  width: calc(100% - 4.7rem);
+  max-width: calc(100% - 4.7rem);
 }
 
 #mainRoomBox.room-player-cards-enabled .playerStateBadge {
-  padding: 0.18rem 0.48rem;
+  padding: 0.16rem 0.4rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.74);
-  border: 1px solid rgba(var(--player-card-accent-rgb), 0.14);
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(var(--player-card-accent-rgb), 0.16);
   color: var(--player-card-ink);
-  font-size: 0.62rem;
+  font-size: 0.58rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   box-shadow: none;
 }
 
@@ -292,7 +297,7 @@
 }
 
 #mainRoomBox.room-player-cards-enabled .playerCardContent {
-  padding-top: 2.45rem;
+  padding-top: 0;
 }
 
 #mainRoomBox.room-player-cards-enabled .playerCardNameplate {
@@ -334,15 +339,15 @@
 }
 
 #mainRoomBox.room-player-cards-enabled .avatarOptionButtons {
-  top: var(--space-md);
-  right: var(--space-md);
+  top: 0.6rem;
+  right: 0.6rem;
   left: auto;
-  gap: 0.375rem;
+  gap: 0.25rem;
 }
 
 #mainRoomBox.room-layout-desktop.room-layout-modern .playerDiv .avatarButton {
-  width: 2rem;
-  height: 2rem;
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 #mainRoomBox.room-player-cards-enabled .playerDiv .avatarButton {
@@ -371,6 +376,16 @@
   background: linear-gradient(180deg, rgba(38, 44, 54, 0.98), rgba(31, 37, 46, 0.98) 60%, rgba(22, 27, 35, 0.98));
   border-color: rgba(226, 232, 240, 0.08);
   box-shadow: var(--shadow-md);
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .playerDiv.playerAlliance-res {
+  background: linear-gradient(180deg, rgba(29, 43, 66, 0.98), rgba(24, 37, 58, 0.98) 60%, rgba(18, 28, 46, 0.98));
+  border-color: rgba(96, 165, 250, 0.22);
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .playerDiv.playerAlliance-spy {
+  background: linear-gradient(180deg, rgba(64, 34, 34, 0.98), rgba(52, 28, 28, 0.98) 60%, rgba(39, 21, 21, 0.98));
+  border-color: rgba(248, 113, 113, 0.18);
 }
 
 .dark #mainRoomBox.room-player-cards-enabled .playerCardGlow {

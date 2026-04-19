@@ -72,3 +72,14 @@ The previous absolute-position hacks for the room bars are removed from the main
 ## Deferred work
 
 This pass intentionally does **not** add the planned empty/loading/error states yet.
+
+
+## Regression follow-up fixes
+
+A follow-up room-layout pass tightens a few edge cases from the first polish release:
+
+- room utility bars now wrap cleanly instead of letting badges and action buttons overlap
+- mobile timer / player-count badges keep dedicated visible space
+- mobile player cards use a narrower centered max width instead of stretching too wide
+- Resistance cards now use stronger contrast against the light room background
+- card top controls reserve more space so badges and action icons do not collide
