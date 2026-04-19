@@ -572,3 +572,67 @@
     width: 100%;
   }
 }
+
+@media (max-width: 767px) {
+  .game-container {
+    height: auto;
+    min-height: calc(100dvh - 70px);
+  }
+
+  .room-layout-mobile .roomInfoBar {
+    grid-template-columns: auto auto;
+    align-items: start;
+  }
+
+  .room-layout-mobile .roomInfoMissionTrack {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .room-layout-mobile .roomInfoMissionTrack #missionsBox {
+    width: 100%;
+  }
+
+  .room-layout-mobile #mainRoomBox {
+    overflow: visible;
+    padding: var(--space-sm) 0;
+  }
+
+  #mainRoomBox.room-layout-mobile.room-layout-modern {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+
+  #mainRoomBox.room-layout-mobile.room-layout-modern .playerDiv {
+    flex: 1 1 var(--room-player-card-preferred-width);
+    width: min(100%, var(--room-player-card-preferred-width));
+    max-width: var(--room-player-card-preferred-width);
+    min-width: min(100%, 8.5rem);
+    margin: 0;
+  }
+
+  #mainRoomBox.room-layout-mobile.room-layout-modern .playerCardMetaRow {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 479px) {
+  .room-layout-mobile .roomInfoBar {
+    grid-template-columns: 1fr;
+  }
+
+  .room-layout-mobile .roomInfoMissionTrack {
+    justify-content: stretch;
+  }
+
+  #mainRoomBox.room-layout-mobile.room-layout-modern .playerDiv {
+    flex-basis: min(100%, var(--room-player-card-preferred-width));
+    width: min(100%, var(--room-player-card-preferred-width));
+    max-width: min(100%, var(--room-player-card-preferred-width));
+  }
+}

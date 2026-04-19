@@ -116,9 +116,16 @@ class Sire {
       // note that the display is the same as lady's display
       socketOfTarget.emit(
         'lady-info',
-        /* "Player " + */ `${this.thisRoom.anonymizer.anon(
-          socket.request.user.username,
-        )} is a ${alliance}.`,
+        {
+          subjectUsername: this.thisRoom.anonymizer.anon(
+            socket.request.user.username,
+          ),
+          alliance,
+          sourceCard: this.card,
+          message: `${this.thisRoom.anonymizer.anon(
+            socket.request.user.username,
+          )} is a ${alliance}.`,
+        },
       );
       // console.log("Player " + target + " is a " + alliance);
 

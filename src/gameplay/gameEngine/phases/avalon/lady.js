@@ -90,9 +90,14 @@ class Lady {
       // emit to the lady holder the person's alliance
       socket.emit(
         'lady-info',
-        /* "Player " + */ `${this.thisRoom.anonymizer.anon(
-          targetUsername,
-        )} is a ${alliance}.`,
+        {
+          subjectUsername: this.thisRoom.anonymizer.anon(targetUsername),
+          alliance,
+          sourceCard: this.card,
+          message: `${this.thisRoom.anonymizer.anon(
+            targetUsername,
+          )} is a ${alliance}.`,
+        },
       );
       // console.log("Player " + target + " is a " + alliance);
 

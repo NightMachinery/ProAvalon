@@ -88,3 +88,15 @@ A follow-up room-layout pass tightens a few edge cases from the first polish rel
 - timer and player-count badges now explicitly reset the old absolute-position rules so mobile and desktop room bars can lay them out normally
 - desktop room sizing now enforces a one-row minimum board budget for modern cards instead of allowing the chrome to consume that space
 - the light room board is a bit grayer, Resistance cards are bluer, and Spy cards are tuned to the same visual intensity band
+
+## Modern room auto-height follow-up
+
+The modern in-room card layout now follows a simpler sizing model:
+
+- modern rooms use a dedicated **card size slider** instead of the old avatar-area height control
+- the chosen modern card size is authoritative; the UI no longer silently shrinks cards to preserve a row cap
+- the room board no longer scrolls internally in modern mode; the room area grows taller instead
+- desktop modern cards use the full available width, while mobile modern cards can wrap into multiple columns when space allows
+- the mission / failed-election track now lives in the top room info bar
+- modern state, vote, and investigation markers use compact inline SVG symbols instead of text-heavy pills
+- private investigation results from Lady / Ref / Sire now persist as a compact eye-marker on the relevant card for the current room session

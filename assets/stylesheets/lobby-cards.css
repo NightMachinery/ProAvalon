@@ -4,6 +4,8 @@
   --room-player-card-gap: 14px;
   --room-grid-columns: 4;
   --room-grid-max-width: 760px;
+  --room-player-card-preferred-width: 146px;
+  --room-player-card-preferred-height: 176px;
 }
 
 .room-container {
@@ -417,4 +419,137 @@
 
 .dark #mainRoomBox.room-player-cards-enabled .playerCardAllianceLabel {
   color: rgba(237, 242, 255, 0.18);
+}
+
+/* === final modern room layout overrides === */
+#mainRoomBox.room-layout-desktop.room-layout-modern {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: var(--space-lg);
+  overflow: visible;
+}
+
+#mainRoomBox.room-layout-desktop.room-layout-modern.room-cards-single-row,
+#mainRoomBox.room-layout-desktop.room-layout-modern.room-cards-multi-row {
+  overflow: visible;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerDiv {
+  justify-content: flex-end;
+  padding: 3.35rem var(--space-md) 0.95rem;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerStateBadges {
+  top: 0.6rem;
+  left: 0.6rem;
+  width: calc(100% - 4rem);
+  max-width: calc(100% - 4rem);
+}
+
+#mainRoomBox.room-player-cards-enabled .playerStateBadge {
+  width: 1.45rem;
+  height: 1.45rem;
+  padding: 0;
+  border-radius: 999px;
+  letter-spacing: 0;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerStateBadgeIcon,
+#mainRoomBox.room-player-cards-enabled .voteBadgeIcon,
+#mainRoomBox.room-player-cards-enabled .playerInvestigationMarkerIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerStateBadgeIcon svg,
+#mainRoomBox.room-player-cards-enabled .voteBadgeIcon svg,
+#mainRoomBox.room-player-cards-enabled .playerInvestigationMarkerIcon svg {
+  width: 100%;
+  height: 100%;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerCardWatermark {
+  inset: 18% 14% 30%;
+  opacity: 0.035;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerCardAllianceLabel {
+  top: 41%;
+  font-size: 0.57rem;
+  letter-spacing: 0.18em;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerCardDivider-top {
+  top: 2.8rem;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerCardDivider-bottom {
+  bottom: 4rem;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerCardContent {
+  justify-content: flex-end;
+  padding-top: 0;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerCardNameplate {
+  margin-top: auto;
+  gap: 0.26rem;
+}
+
+#mainRoomBox.room-player-cards-enabled .username-p-card {
+  display: block;
+  line-height: 1.1;
+}
+
+#mainRoomBox.room-player-cards-enabled .role-p {
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerCardMetaRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
+  width: 100%;
+  min-height: 1.5rem;
+  margin-top: 0.4rem;
+}
+
+#mainRoomBox.room-player-cards-enabled .cardsContainer {
+  width: auto;
+  min-height: 0;
+  margin-top: 0;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerInvestigationMarker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  border: 1px dashed rgba(var(--player-card-accent-rgb), 0.34);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--player-card-ink);
+  box-shadow: var(--shadow-sm);
+}
+
+#mainRoomBox.room-player-cards-enabled .playerInvestigationMarker-res {
+  color: #2563eb;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerInvestigationMarker-spy {
+  color: #dc2626;
+}
+
+.dark #mainRoomBox.room-player-cards-enabled .playerInvestigationMarker {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #edf2ff;
 }

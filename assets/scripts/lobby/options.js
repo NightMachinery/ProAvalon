@@ -350,6 +350,45 @@ var userOptions = {
     },
   },
 
+  optionDisplayRoomCardScale: {
+    defaultValue: '100',
+    onLoad() {
+      const savedScale = docCookies.getItem('optionDisplayRoomCardScale');
+      const slider = $('#option_display_room_card_scale')[0];
+      const valueDisplay = $('#roomCardScaleValue')[0];
+      const nextValue = savedScale || '100';
+
+      slider.value = nextValue;
+      valueDisplay.innerHTML = `${nextValue}%`;
+      applyRoomCardScaleVariables();
+      updateRoomCardScaleControlState(
+        $('#option_display_room_player_cards')[0].checked === true
+      );
+    },
+    initialiseEventListener() {
+      const slider = $('#option_display_room_card_scale')[0];
+      const valueDisplay = $('#roomCardScaleValue')[0];
+
+      slider.oninput = function oninputRoomCardScale() {
+        valueDisplay.innerHTML = `${slider.value}%`;
+      };
+
+      slider.addEventListener('change', () => {
+        valueDisplay.innerHTML = `${slider.value}%`;
+        docCookies.setItem(
+          'optionDisplayRoomCardScale',
+          slider.value,
+          Infinity
+        );
+        applyRoomCardScaleVariables();
+        syncGamePaneLayout();
+        if (roomPlayersData) {
+          draw();
+        }
+      });
+    },
+  },
+
   optionDisplayUseOldGameIcons: {
     defaultValue: 'false',
     onLoad() {

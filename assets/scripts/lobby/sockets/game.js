@@ -51,7 +51,21 @@ socket.on('game-data', (data) => {
   }
 });
 
-socket.on('lady-info', (message) => {
+socket.on('lady-info', (payload) => {
+  let message = payload;
+
+  if (payload && typeof payload === 'object') {
+    message = payload.message || '';
+
+    if (payload.subjectUsername && payload.alliance) {
+      playerInvestigations[payload.subjectUsername] = {
+        alliance: payload.alliance,
+        sourceCard: payload.sourceCard,
+      };
+      draw();
+    }
+  }
+
   const str = `${message} (this message is only shown to you)`;
   const data = { message: str, classStr: 'special-text noselect' };
 

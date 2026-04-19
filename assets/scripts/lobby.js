@@ -15,6 +15,49 @@ const buttons = {
 
 const responsiveLayoutHelpers = window.ProAvalonLobbyLayout || {};
 let responsiveLayoutTimeout;
+const DEFAULT_ROOM_CARD_SCALE = 100;
+const MIN_ROOM_CARD_SCALE = 70;
+const MAX_ROOM_CARD_SCALE = 130;
+const ROOM_CARD_BASE_WIDTH = 146;
+const ROOM_CARD_BASE_HEIGHT = 176;
+
+function getRoomCardScalePercent() {
+  const parsed = parseInt(docCookies.getItem('optionDisplayRoomCardScale'), 10);
+  if (Number.isNaN(parsed)) {
+    return DEFAULT_ROOM_CARD_SCALE;
+  }
+
+  return Math.min(MAX_ROOM_CARD_SCALE, Math.max(MIN_ROOM_CARD_SCALE, parsed));
+}
+
+function applyRoomCardScaleVariables() {
+  const scaleMultiplier = getRoomCardScalePercent() / 100;
+  const preferredWidth = Math.round(ROOM_CARD_BASE_WIDTH * scaleMultiplier);
+  const preferredHeight = Math.round(ROOM_CARD_BASE_HEIGHT * scaleMultiplier);
+
+  document.documentElement.style.setProperty(
+    '--room-player-card-preferred-width',
+    `${preferredWidth}px`
+  );
+  document.documentElement.style.setProperty(
+    '--room-player-card-preferred-height',
+    `${preferredHeight}px`
+  );
+}
+
+function updateRoomCardScaleControlState(modernEnabled) {
+  const modernCardsChecked = modernEnabled === true;
+  const scaleSlider = $('#option_display_room_card_scale')[0];
+  const avatarHeightInput = $('#option_display_avatar_container_height_text')[0];
+
+  if (scaleSlider) {
+    scaleSlider.disabled = modernCardsChecked === false;
+  }
+
+  if (avatarHeightInput) {
+    avatarHeightInput.disabled = modernCardsChecked === true;
+  }
+}
 
 function isMobileViewport() {
   return (
@@ -32,6 +75,21 @@ function syncGamePaneLayout() {
   const parentWidth = resizeParent.width();
   if (parentWidth && Math.abs($('#div1Resize').width() - parentWidth) > 1) {
     $('#div1Resize').width(parentWidth);
+  }
+
+  if (isRoomPlayerCardsEnabled()) {
+    $('#div1Resize').css('height', 'auto');
+    $('#div2Resize').css('height', 'auto');
+
+    if ($('#div1Resize').hasClass('ui-resizable')) {
+      try {
+        $('#div1Resize').resizable('disable');
+      } catch (error) {
+        // Ignore until the resizable widget is fully initialised.
+      }
+    }
+
+    return;
   }
 
   if (isMobileViewport()) {
@@ -94,6 +152,7 @@ function refreshResponsiveLayout(redraw = false) {
     responsiveLayoutHelpers.applyResponsiveState();
   }
 
+  applyRoomCardScaleVariables();
   syncGamePaneLayout();
   updateTwoTabs(docCookies.getItem('optionDisplayTwoTabs') === 'true');
   extendTabContentToBottomInRoom();
@@ -387,6 +446,7 @@ function draw() {
 let selectedAvatars = {};
 const numOfStatesOfHighlight = 3;
 const selectedChat = {};
+let playerInvestigations = {};
 function activateAvatarButtons() {
   // console.log("activate avatar buttons");
   // console.log("LOL");
@@ -567,9 +627,6 @@ function drawMiddleBoxes() {
       pickBoxes[j].classList.remove('pickBoxFill');
     }
   }
-
-  const roomBoardWidth = $('.roomBoard').width() || $('#mainRoomBox').width();
-  $('#missionsBox').css('left', `${roomBoardWidth / 2}px`);
 }
 
 const playerDivHeightPercent = 30;
@@ -585,6 +642,7 @@ function resetPlayerDivInlineLayout(divs) {
 }
 
 function drawAndPositionAvatars() {
+  applyRoomCardScaleVariables();
   const w = $('#mainRoomBox').width();
   const h = $('#mainRoomBox').height();
 
@@ -749,33 +807,37 @@ function positionPlayerCards(divs, w, h) {
     return;
   }
 
-  const columns = responsiveLayoutHelpers.getDesktopCardColumns
-    ? responsiveLayoutHelpers.getDesktopCardColumns(numPlayers)
-    : Math.min(numPlayers, 5);
-  const cardGap = Math.max(10, Math.min(18, w * 0.015));
-  const horizontalPadding = Math.max(12, Math.min(32, w * 0.035));
-  const verticalPadding = Math.max(10, Math.min(24, h * 0.06));
-  const rowCount = numPlayers >= 5 ? 2 : 1;
-
-  let cardWidth =
-    (w - horizontalPadding * 2 - cardGap * Math.max(columns - 1, 0)) /
-    Math.max(columns, 1);
-  cardWidth = Math.min(170, Math.max(120, cardWidth));
-
-  let cardHeight = Math.min(182, cardWidth * 1.32);
-  if (rowCount === 2) {
-    const maxCardHeightForRows = (h - verticalPadding * 2 - cardGap) / 2;
-    cardHeight = Math.min(cardHeight, maxCardHeightForRows);
-  }
-  cardHeight = Math.max(140, cardHeight);
-
-  const maxGridWidth = columns * cardWidth + Math.max(columns - 1, 0) * cardGap;
+  const rootStyles = window.getComputedStyle(document.documentElement);
+  const preferredWidth =
+    parseFloat(rootStyles.getPropertyValue('--room-player-card-preferred-width')) ||
+    ROOM_CARD_BASE_WIDTH;
+  const preferredHeight =
+    parseFloat(rootStyles.getPropertyValue('--room-player-card-preferred-height')) ||
+    ROOM_CARD_BASE_HEIGHT;
+  const cardGap = Math.max(12, Math.min(20, w * 0.015));
+  const horizontalPadding = Math.max(12, Math.min(32, w * 0.03));
+  const usableWidth = Math.max(w - horizontalPadding * 2, 120);
+  const actualCardWidth = Math.max(96, Math.min(preferredWidth, usableWidth));
+  const columns = Math.max(
+    1,
+    Math.min(
+      numPlayers,
+      Math.floor((usableWidth + cardGap) / (actualCardWidth + cardGap))
+    )
+  );
+  const rowCount = Math.ceil(numPlayers / columns);
+  const cardHeight = Math.round(
+    preferredHeight * (actualCardWidth / preferredWidth)
+  );
+  const maxGridWidth =
+    columns * actualCardWidth + Math.max(columns - 1, 0) * cardGap;
   const singleRow = rowCount === 1;
 
   $('#mainRoomBox').toggleClass('room-cards-single-row', singleRow);
+  $('#mainRoomBox').toggleClass('room-cards-multi-row', rowCount > 1);
   $('#mainRoomBox').css('--room-grid-columns', `${columns}`);
   $('#mainRoomBox').css('--room-grid-max-width', `${maxGridWidth}px`);
-  $('#mainRoomBox').css('--room-player-card-width', `${cardWidth}px`);
+  $('#mainRoomBox').css('--room-player-card-width', `${actualCardWidth}px`);
   $('#mainRoomBox').css('--room-player-card-height', `${cardHeight}px`);
   $('#mainRoomBox').css('--room-player-card-gap', `${cardGap}px`);
 }
@@ -1229,10 +1291,40 @@ function getUsernameFromIndex(index) {
   return false;
 }
 
+function buildRoomGlyph(kind) {
+  switch (kind) {
+    case 'leader':
+      return "<svg viewBox='0 0 24 24' focusable='false'><path d='M4 18.5h16M6 18.5V7.5l3 2.25 3-4 3 4 3-2.25v11' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' fill='none'></path></svg>";
+    case 'hammer':
+      return "<svg viewBox='0 0 24 24' focusable='false'><path d='M6.5 8.25 11 3.75l3.25 3.25-4.5 4.5M10.5 4.25l7.75 7.75M6.75 17.25l7.5-7.5 3 3-7.5 7.5H6.75Z' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' fill='none'></path></svg>";
+    case 'claim':
+      return "<svg viewBox='0 0 24 24' focusable='false'><path d='M6.5 20V4.25M7.25 5.25h8.75l-1.75 3 1.75 3H7.25' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' fill='none'></path></svg>";
+    case 'team':
+      return "<svg viewBox='0 0 24 24' focusable='false'><circle cx='8' cy='9' r='2.25' stroke='currentColor' stroke-width='1.7' fill='none'></circle><circle cx='16.25' cy='8' r='1.85' stroke='currentColor' stroke-width='1.7' fill='none'></circle><path d='M4.75 17.75a3.75 3.75 0 0 1 6.5-2.5M14 17.25l2 2 4-4' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' fill='none'></path></svg>";
+    case 'offline':
+      return "<svg viewBox='0 0 24 24' focusable='false'><path d='M4.5 9.5a11 11 0 0 1 15 0M7.5 12.5a6.8 6.8 0 0 1 6.25-1.3M10.5 15.5a3 3 0 0 1 1.5-.4M4 4l16 16' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' fill='none'></path><circle cx='12' cy='19' r='1.2' fill='currentColor'></circle></svg>";
+    case 'danger':
+      return "<svg viewBox='0 0 24 24' focusable='false'><path d='M12 5.25v6.5M12 16.5v.25M6.5 20h11a2 2 0 0 0 1.72-3L13.72 7.5a2 2 0 0 0-3.44 0L4.78 17A2 2 0 0 0 6.5 20Z' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' fill='none'></path></svg>";
+    case 'approve':
+      return "<svg viewBox='0 0 24 24' focusable='false'><circle cx='12' cy='12' r='8.25' stroke='currentColor' stroke-width='1.7' fill='none'></circle><path d='m8.75 12.25 2.25 2.25 4.5-4.75' stroke='currentColor' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round' fill='none'></path></svg>";
+    case 'reject':
+      return "<svg viewBox='0 0 24 24' focusable='false'><circle cx='12' cy='12' r='8.25' stroke='currentColor' stroke-width='1.7' fill='none'></circle><path d='m9 9 6 6M15 9l-6 6' stroke='currentColor' stroke-width='1.9' stroke-linecap='round'></path></svg>";
+    case 'investigation-res':
+      return "<svg viewBox='0 0 24 24' focusable='false'><path d='M2.75 12s3.25-5.5 9.25-5.5 9.25 5.5 9.25 5.5-3.25 5.5-9.25 5.5S2.75 12 2.75 12Z' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' fill='none' stroke-dasharray='2 1.3'></path><circle cx='12' cy='12' r='2.4' fill='currentColor'></circle></svg>";
+    case 'investigation-spy':
+      return "<svg viewBox='0 0 24 24' focusable='false'><path d='M2.75 12s3.25-5.5 9.25-5.5 9.25 5.5 9.25 5.5-3.25 5.5-9.25 5.5S2.75 12 2.75 12Z' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' fill='none' stroke-dasharray='2 1.3'></path><path d='M10.2 12a1.8 1.8 0 1 0 3.6 0 1.8 1.8 0 0 0-3.6 0Z' fill='currentColor'></path></svg>";
+    default:
+      return "<svg viewBox='0 0 24 24' focusable='false'><circle cx='12' cy='12' r='3' fill='currentColor'></circle></svg>";
+  }
+}
+
 function buildPlayerStateBadge(label, modifier) {
-  return `<span class='playerStateBadge playerStateBadge-${modifier}'>${escapeHtml(
+  const glyphKey = modifier === 'danger' ? 'danger' : modifier;
+  return `<span class='playerStateBadge playerStateBadge-${modifier}' title='${escapeHtml(
     label
-  )}</span>`;
+  )}' aria-label='${escapeHtml(label)}'><span class='playerStateBadgeIcon' aria-hidden='true'>${buildRoomGlyph(
+    glyphKey
+  )}</span></span>`;
 }
 
 function getPlayerAllianceLabel(alliance) {
@@ -1273,6 +1365,35 @@ function buildAvatarActionIcon(kind) {
         <path d='M3.5 12h2.25M18.25 12h2.25M12 3.5v2.25' stroke='currentColor' stroke-width='1.7' stroke-linecap='round'></path>
       </svg>
     </span>`;
+}
+
+function buildVoteResultBadge(voteKind) {
+  const label = voteKind === 'approve' ? 'Approve vote' : 'Reject vote';
+  return `<span class='${voteKind}Label invisible' title='${label}' aria-label='${label}'><span class='voteBadgeIcon' aria-hidden='true'>${buildRoomGlyph(
+    voteKind
+  )}</span></span>`;
+}
+
+function getInvestigationMarkerMarkup(username) {
+  const investigation = playerInvestigations[username];
+  if (!investigation) {
+    return '';
+  }
+
+  const alliance = investigation.alliance === 'spy' ? 'spy' : 'res';
+  const readableAlliance = alliance === 'spy' ? 'Spy' : 'Resistance';
+  const sourceText = investigation.sourceCard
+    ? ` via ${investigation.sourceCard}`
+    : '';
+  const markerLabel = `Seen as ${readableAlliance}${sourceText}. This result may be deceptive.`;
+
+  return `<span class='playerInvestigationMarker playerInvestigationMarker-${alliance}' title='${escapeHtml(
+    markerLabel
+  )}' aria-label='${escapeHtml(
+    markerLabel
+  )}'><span class='playerInvestigationMarkerIcon' aria-hidden='true'>${buildRoomGlyph(
+    `investigation-${alliance}`
+  )}</span></span>`;
 }
 
 function strOfAvatar(playerData, alliance) {
@@ -1453,6 +1574,7 @@ function strOfAvatar(playerData, alliance) {
     ? 'username-p username-p-card'
     : 'username-p';
   const allianceLabel = getPlayerAllianceLabel(alliance);
+  const investigationMarkup = getInvestigationMarkerMarkup(playerData.username);
   const playerClassNames = ['playerDiv'];
 
   if (cardModeEnabled === true) {
@@ -1482,8 +1604,8 @@ function strOfAvatar(playerData, alliance) {
   str += '</span>';
   str += playerStateBadges;
 
-  str += '<span class="approveLabel invisible">Approve</span>';
-  str += '<span class="rejectLabel invisible">Reject</span>';
+  str += buildVoteResultBadge('approve');
+  str += buildVoteResultBadge('reject');
   str += "<span class='playerCardGlow'></span>";
   str += "<span class='playerCardInset'></span>";
   if (cardModeEnabled === true) {
@@ -1493,7 +1615,9 @@ function strOfAvatar(playerData, alliance) {
     str += "<span class='playerCardDivider playerCardDivider-bottom' aria-hidden='true'></span>";
     str += "<span class='playerCardContent'>";
     str += `<span class='playerCardNameplate'><p class='${usernameTextClass}'> ${escapedUsername} </p>${role}</span>`;
-    str += '<span class="cardsContainer"></span>';
+    str += "<span class='playerCardMetaRow'><span class=\"cardsContainer\"></span>";
+    str += investigationMarkup;
+    str += '</span>';
     str += '</span>';
   } else {
     str += "<span class='playerAvatarFrame'></span>";
@@ -1898,6 +2022,7 @@ function resetAllGameData() {
   isSpectator = false;
 
   selectedAvatars = {};
+  playerInvestigations = {};
 
   print_gameplay_text_game_started = false;
   print_gameplay_text_picked_team = false;
@@ -1937,6 +2062,7 @@ function resetGameToWaitingLobby() {
   gameStarted = false;
   seeData = undefined;
   selectedAvatars = {};
+  playerInvestigations = {};
 
   print_gameplay_text_game_started = false;
   print_gameplay_text_picked_team = false;
@@ -1967,7 +2093,7 @@ let tempVar = 0;
 const gameContainer = $('.game-container')[0];
 
 function extendTabContentToBottomInRoom() {
-  if (!gameContainer || !gameContainer.offsetHeight) {
+  if (!gameContainer) {
     return;
   }
 
@@ -1980,10 +2106,11 @@ function extendTabContentToBottomInRoom() {
     const navHeight = $tabColumn.find('.nav').first().height() || 0;
     tempVar = navHeight > 40 ? 37 : 0;
 
-    const columnTop = $tabColumn.position().top || 0;
+    const rect = tabColumn.getBoundingClientRect();
+    const columnTop = rect.top || 0;
     const nextHeight = Math.max(
       220,
-      Math.floor(gameContainer.offsetHeight - columnTop) - 20 - tempVar
+      Math.floor(window.innerHeight - columnTop) - 24 - tempVar
     );
 
     tabColumn.style.height = `${nextHeight}px`;
@@ -2155,10 +2282,13 @@ function updateTwoTabs(checked) {
 
 function updateRoomPlayerCards(checked) {
   $('#mainRoomBox').toggleClass('room-player-cards-enabled', checked === true);
+  updateRoomCardScaleControlState(checked === true);
 
   if (responsiveLayoutHelpers.applyRoomLayoutClasses) {
     responsiveLayoutHelpers.applyRoomLayoutClasses(checked === true, getRoomPlayerDivs().length);
   }
+
+  syncGamePaneLayout();
 
   if (roomPlayersData) {
     draw();
@@ -2206,8 +2336,9 @@ function scaleGameComponents() {
   );
 
   if (isRoomPlayerCardsEnabled()) {
-    $('.approveLabel').css('transform', 'translateX(-50%)');
-    $('.rejectLabel').css('transform', 'translateX(-50%)');
+    $('#missionsBox').css('transform', 'none');
+    $('.approveLabel').css('transform', 'none');
+    $('.rejectLabel').css('transform', 'none');
     return;
   }
 

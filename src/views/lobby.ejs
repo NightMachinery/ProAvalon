@@ -124,9 +124,34 @@
   <div id="div1Resize">
     <div class="room-container">
       <div class="roomInfoBar roomBar">
-        <button id="claimButton" class="disabled btn btn-game btn-game-primary">
-          Claim
-        </button>
+        <div class="roomInfoPrimary">
+          <button
+            id="claimButton"
+            class="disabled btn btn-game btn-game-primary"
+          >
+            Claim
+          </button>
+        </div>
+
+        <div class="roomInfoMissionTrack">
+          <div id="missionsBox" class="invisible">
+            <div class="row missionTrackRow">
+              <div class="missionBox" id="missionBox0"></div>
+              <div class="missionBox" id="missionBox1"></div>
+              <div class="missionBox" id="missionBox2"></div>
+              <div class="missionBox" id="missionBox3"></div>
+              <div class="missionBox" id="missionBox4"></div>
+            </div>
+
+            <div class="row pickTrackRow">
+              <div class="pickBox" id="pickBox0"></div>
+              <div class="pickBox" id="pickBox1"></div>
+              <div class="pickBox" id="pickBox2"></div>
+              <div class="pickBox" id="pickBox3"></div>
+              <div class="pickBox" id="pickBox4"></div>
+            </div>
+          </div>
+        </div>
 
         <div class="roomInfoBadges">
           <div class="gameInfoMaxPlayers badge badge-game">8/9</div>
@@ -137,24 +162,6 @@
       <div class="roomBoard">
         <div id="mainRoomBox" class="">
           <p></p>
-        </div>
-
-        <div id="missionsBox" class="invisible">
-          <div class="row missionTrackRow">
-            <div class="missionBox" id="missionBox0"></div>
-            <div class="missionBox" id="missionBox1"></div>
-            <div class="missionBox" id="missionBox2"></div>
-            <div class="missionBox" id="missionBox3"></div>
-            <div class="missionBox" id="missionBox4"></div>
-          </div>
-
-          <div class="row pickTrackRow">
-            <div class="pickBox" id="pickBox0"></div>
-            <div class="pickBox" id="pickBox1"></div>
-            <div class="pickBox" id="pickBox2"></div>
-            <div class="pickBox" id="pickBox3"></div>
-            <div class="pickBox" id="pickBox4"></div>
-          </div>
         </div>
 
         <span class="gun gunBefore"

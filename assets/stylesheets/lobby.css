@@ -2316,3 +2316,129 @@ body {
             0 0 0 7px rgba(128, 128, 128, 0.14),
             var(--shadow-card-hover) !important;
 }
+
+/* === final room chrome / spacing overrides === */
+.game-container {
+    height: auto;
+    min-height: calc(100dvh - 70px);
+    max-height: none;
+    padding-top: var(--space-lg);
+    padding-bottom: var(--space-xl);
+}
+
+.room-container {
+    gap: var(--space-lg);
+}
+
+.roomBar {
+    gap: var(--space-md);
+}
+
+.roomInfoBar {
+    align-items: center;
+}
+
+.roomInfoPrimary {
+    flex: 0 0 auto;
+}
+
+.roomInfoMissionTrack {
+    flex: 1 1 22rem;
+    display: flex;
+    justify-content: center;
+    min-width: 0;
+}
+
+.roomBoard {
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow: visible;
+}
+
+#mainRoomBox.room-player-cards-enabled {
+    height: auto;
+    overflow: visible;
+}
+
+#mainRoomBox.room-player-cards-enabled .gameTimer,
+#mainRoomBox.room-player-cards-enabled .gameInfoMaxPlayers {
+    position: static;
+}
+
+#missionsBox {
+    position: static;
+    top: auto;
+    left: auto;
+    z-index: auto;
+    width: auto;
+    max-width: none;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    transform: none !important;
+}
+
+#missionsBox.invisible {
+    display: none;
+}
+
+#missionsBox .missionTrackRow,
+#missionsBox .pickTrackRow {
+    justify-content: center;
+    height: auto;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+#missionsBox .missionTrackRow {
+    gap: 0.4rem;
+}
+
+#missionsBox .pickTrackRow {
+    gap: 0.48rem;
+    margin-top: 0.3rem;
+}
+
+.missionBox {
+    width: 2.2rem;
+    height: 2.2rem;
+}
+
+.missionBox p {
+    font-size: 0.76rem;
+}
+
+.pickBox {
+    width: 0.58rem;
+    height: 0.58rem;
+}
+
+.approveLabel,
+.rejectLabel {
+    top: auto;
+    left: auto;
+    right: 0.7rem;
+    bottom: 0.7rem;
+    transform: none !important;
+    width: 1.55rem;
+    height: 1.55rem;
+    padding: 0;
+    border-radius: 999px;
+}
+
+.approveLabel .voteBadgeIcon,
+.rejectLabel .voteBadgeIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.95rem;
+    height: 0.95rem;
+}
+
+.approveLabel .voteBadgeIcon svg,
+.rejectLabel .voteBadgeIcon svg {
+    width: 100%;
+    height: 100%;
+}
