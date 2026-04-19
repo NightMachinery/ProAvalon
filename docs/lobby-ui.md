@@ -1,69 +1,74 @@
 # Lobby and in-room player UI
 
-ProAvalon now supports responsive lobby and game-room layouts with separate mobile and desktop behavior.
+ProAvalon’s lobby and game room now share a tighter visual system without changing gameplay, sockets, or room flow.
+
+## What changed
+
+- A shared **spacing, type, color, radius, and shadow token set** now drives the lobby and room UI.
+- The lobby and room use vendored **Inter** and **JetBrains Mono** font assets from `assets/fonts/` instead of external font requests.
+- Core controls now use semantic styling tiers:
+  - **Primary**: Claim, New Room, Start
+  - **Secondary**: Back, Copy link, Restart lobby
+  - **Danger**: red cancel / reject gameplay action
+- Timer and metadata badges now use **tabular numerals** to avoid width jitter.
 
 ## Lobby layout
 
 ### Mobile (< 768px)
 
-- The lobby now defaults to the **Games & Players** panel.
-- A **mobile tab switcher** lets players swap between **Games & Players** and **All Chat**.
-- Lobby columns stack vertically instead of forcing a 50/50 split.
+- The lobby still defaults to the **Games & Players** panel.
+- The existing mobile tab switcher is now styled as a more polished segmented control.
+- Chat and games/players panels share the same panel shell, spacing, and typography.
 
 ### Desktop (>= 768px)
 
-- The lobby keeps the existing wider split view for chat plus games/players.
-- The mobile tab switcher is hidden.
+- The desktop split remains the existing **chat-heavy 9/3 layout**.
+- Chat and games/players now use matched panel shells so the right column feels intentional instead of sidebar-like.
+- Game rows remain table-backed for compatibility, but are styled to read as compact cards.
 
 ## In-room layouts
 
+### Shared room structure
+
+Both modern and legacy modes now use the same room chrome:
+
+- quiet **top utility bar** for Claim, timer, and player count
+- central **room board** containing players, mission track, and overlays
+- **bottom action bar** for Back, Copy link, and Restart lobby
+
+The previous absolute-position hacks for the room bars are removed from the main flow.
+
 ### Modern player cards
 
-The default in-room layout remains the **modern player card** view.
-
-- **Desktop modern** uses centered responsive card rows instead of JS absolute positioning.
-- **Mobile modern** switches to a stacked, scrollable card list with larger touch targets.
-- Public state stays visible on the card via compact chips, including leader, hammer, claim, team, away, and shot.
-- Public cards such as Lady / Ref / Sire still appear on the card.
+- Desktop modern mode still uses the responsive centered card grid.
+- Cards now share the new surface/border/shadow language.
+- Decorative glow and watermark layers are toned down so player identity remains the main focus.
+- Public state chips remain visible, but use softer badge treatment.
 
 ### Legacy in-room layout
 
-Players can still switch back to the older avatar-based in-room layout.
+- Legacy mode still keeps the classic player positioning behavior.
+- Legacy player containers now use the same surrounding surface, radius, and typography cues as modern mode so both modes feel like the same product.
 
-- **Desktop legacy** keeps the classic spatial avatar layout.
-- **Mobile legacy** switches to a stacked avatar list instead of the desktop circular board.
+## Mission and action polish
 
-Open the **options cog** in the lobby, then go to **Display** and use:
+- The mission strip is still centered over the room board, but is styled as a unified progress indicator.
+- The current unresolved mission now gets a dedicated highlight state.
+- Room action icons now use inline SVG buttons with tooltips/labels instead of raw glyphicons.
+- Chat highlight state is represented by a small accent dot on the action button instead of filling the whole control.
 
-- **Use modern player cards (uncheck for legacy in-room layout)**
+## Theme behavior
 
-That setting is persistent via the existing `optionDisplayRoomPlayerCards` cookie.
+- Lobby and room surfaces now derive from CSS variables for both light and dark mode.
+- The existing site-wide dark theme toggle still works; lobby/room components now override more of their own presentation through shared tokens instead of one-off colors.
 
-## Mobile room controls
+## Still supported
 
-On mobile, room controls are reorganized for touch:
+- **Modern** and **legacy** in-room modes
+- **Two tabs** desktop room option
+- **Use original avatars** option for legacy mode
+- existing gameplay, chat, claim, vote, and restart flows
 
-- A sticky **top info bar** shows Claim, timer, and player count.
-- A sticky **bottom action bar** shows Back, Copy link, and Restart lobby.
-- Avatar action buttons are always visible and sized for touch.
+## Deferred work
 
-## Desktop-only display controls
-
-These display options are still supported on desktop, but are hidden on mobile:
-
-- **Height of avatar area**
-- **Max height of avatars**
-- **Two tabs**
-
-## Removed viewport hack
-
-The old JS viewport height rewrite has been removed.
-
-- Mobile sizing now relies on CSS responsive layout and dynamic viewport-safe spacing.
-- Layout refreshes are event-driven instead of relying on the old polling loop.
-
-## Avatar settings interaction
-
-The **Use original avatars (hide custom avatars)** option only matters for the **legacy avatar-based layout**.
-
-The modern player cards do not render the large avatar image at all.
+This pass intentionally does **not** add the planned empty/loading/error states yet.

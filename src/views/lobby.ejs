@@ -60,67 +60,61 @@
 
   <div class="row lobby-main-row">
     <div class="col-xs-12 col-sm-9 lobby-mobile-panel" id="col1">
-      <div style="position: relative">
-        <strong>
-          <span id="all-chat-lobby-text"> All Chat </span>
-        </strong>
+      <section class="lobby-panel-shell lobby-panel-chat">
+        <div class="lobby-section-header">
+          <h2 class="section-title" id="all-chat-lobby-text">All Chat</h2>
 
-        <div
-          react-entrypoint
-          id="reportDiv"
-          style="
-            float: right;
-            position: absolute;
-            right: 0;
-            transform: translate(0, -100%);
-          "
-        >
-          <%-reportsReact%>
+          <div react-entrypoint id="reportDiv" class="lobby-section-report">
+            <%-reportsReact%>
+          </div>
         </div>
-      </div>
 
-      <div class="chat-window" id="all-chat-lobby">
-        <ol class="chat-list all-chat-list" id="all-chat-lobby-list"></ol>
-      </div>
-      <p id="all-chat-lobby-bar" class="hidden chat-bar"></p>
+        <div class="chat-window" id="all-chat-lobby">
+          <ol class="chat-list all-chat-list" id="all-chat-lobby-list"></ol>
+        </div>
+        <p id="all-chat-lobby-bar" class="hidden chat-bar"></p>
 
-      <input type="text" class="chat-message-input all-chat-message-input" />
+        <input type="text" class="chat-message-input all-chat-message-input" />
+      </section>
     </div>
 
     <div class="col-xs-12 col-sm-3 lobby-mobile-panel active" id="col2">
-      <!-- <br> -->
-      <strong>
-        <p>Games (<span class="games-count">0</span>):</p>
-      </strong>
+      <section class="lobby-panel-shell lobby-panel-games">
+        <div class="lobby-section-header lobby-section-header--stacked">
+          <div>
+            <h2 class="section-title">Games</h2>
+            <p class="section-subtitle">
+              <span class="games-count">0</span> active rooms
+            </p>
+          </div>
+          <a id="newRoom" class="btn btn-game btn-game-primary" href="#"
+            >New Room</a
+          >
+        </div>
 
-      <a id="newRoom" class="btn btn-default" href="#">New Room</a>
+        <div react-entrypoint id="matchmakingDiv" class="lobby-matchmaking-shell">
+          <%-matchmakingReact%>
+        </div>
 
-      <br />
-      <br />
+        <table
+          id="current-games-table"
+          class="table table-bordered table-striped lobby-table"
+        >
+          <tbody></tbody>
+        </table>
 
-      <div react-entrypoint id="matchmakingDiv"><%-matchmakingReact%></div>
+        <div class="lobby-subsection-header">
+          <h3 class="section-title section-title--compact">Online players</h3>
+          <span class="section-meta player-count"></span>
+        </div>
 
-      <br />
-      <br />
-
-      <table
-        id="current-games-table"
-        class="table table-bordered table-striped lobby-table"
-      >
-        <tbody></tbody>
-      </table>
-
-      <br />
-      <p>
-        <strong>Online players (<span class="player-count"></span>):</strong>
-      </p>
-
-      <table
-        id="current-players-table"
-        class="table table-bordered table-striped lobby-table"
-      >
-        <tbody></tbody>
-      </table>
+        <table
+          id="current-players-table"
+          class="table table-bordered table-striped lobby-table"
+        >
+          <tbody></tbody>
+        </table>
+      </section>
     </div>
   </div>
 </div>
@@ -129,58 +123,68 @@
   <!-- container -->
   <div id="div1Resize">
     <div class="room-container">
-      <div class="roomInfoBar">
-        <button id="claimButton" class="disabled btn btn-primary">Claim</button>
+      <div class="roomInfoBar roomBar">
+        <button id="claimButton" class="disabled btn btn-game btn-game-primary">
+          Claim
+        </button>
 
         <div class="roomInfoBadges">
-          <div class="gameInfoMaxPlayers badge">8/9</div>
-          <div class="gameTimer badge">--:--</div>
+          <div class="gameInfoMaxPlayers badge badge-game">8/9</div>
+          <div class="gameTimer badge badge-game">--:--</div>
         </div>
       </div>
 
-      <div id="mainRoomBox" class="">
-        <p></p>
+      <div class="roomBoard">
+        <div id="mainRoomBox" class="">
+          <p></p>
+        </div>
+
+        <div id="missionsBox" class="invisible">
+          <div class="row missionTrackRow">
+            <div class="missionBox" id="missionBox0"></div>
+            <div class="missionBox" id="missionBox1"></div>
+            <div class="missionBox" id="missionBox2"></div>
+            <div class="missionBox" id="missionBox3"></div>
+            <div class="missionBox" id="missionBox4"></div>
+          </div>
+
+          <div class="row pickTrackRow">
+            <div class="pickBox" id="pickBox0"></div>
+            <div class="pickBox" id="pickBox1"></div>
+            <div class="pickBox" id="pickBox2"></div>
+            <div class="pickBox" id="pickBox3"></div>
+            <div class="pickBox" id="pickBox4"></div>
+          </div>
+        </div>
+
+        <span class="gun gunBefore"
+          ><img class="gunImg" src="pictures/gun.png"
+        /></span>
+        <span class="gun gunBefore"
+          ><img class="gunImg" src="pictures/gun.png"
+        /></span>
+        <span class="gun gunBefore"
+          ><img class="gunImg" src="pictures/gun.png"
+        /></span>
+        <span class="gun gunBefore"
+          ><img class="gunImg" src="pictures/gun.png"
+        /></span>
+        <span class="gun gunBefore"
+          ><img class="gunImg" src="pictures/gun.png"
+        /></span>
       </div>
-      <div class="roomHeaderButtons">
-        <button id="backButton" class="btn btn-warning">Back</button>
-        <button id="copyRoomLinkButton" class="btn btn-info">Copy link</button>
-        <button id="restartRoomButton" class="btn btn-warning hidden">
+
+      <div class="roomHeaderButtons roomBar">
+        <button id="backButton" class="btn btn-game btn-game-secondary">
+          Back
+        </button>
+        <button id="copyRoomLinkButton" class="btn btn-game btn-game-secondary">
+          Copy link
+        </button>
+        <button id="restartRoomButton" class="btn btn-game btn-game-secondary hidden">
           Restart lobby
         </button>
       </div>
-      <div id="missionsBox" class="invisible">
-        <div class="row">
-          <div class="missionBox" id="missionBox0"></div>
-          <div class="missionBox" id="missionBox1"></div>
-          <div class="missionBox" id="missionBox2"></div>
-          <div class="missionBox" id="missionBox3"></div>
-          <div class="missionBox" id="missionBox4"></div>
-        </div>
-
-        <div class="row">
-          <div class="pickBox" id="pickBox0"></div>
-          <div class="pickBox" id="pickBox1"></div>
-          <div class="pickBox" id="pickBox2"></div>
-          <div class="pickBox" id="pickBox3"></div>
-          <div class="pickBox" id="pickBox4"></div>
-        </div>
-      </div>
-
-      <span class="gun gunBefore"
-        ><img class="gunImg" src="pictures/gun.png"
-      /></span>
-      <span class="gun gunBefore"
-        ><img class="gunImg" src="pictures/gun.png"
-      /></span>
-      <span class="gun gunBefore"
-        ><img class="gunImg" src="pictures/gun.png"
-      /></span>
-      <span class="gun gunBefore"
-        ><img class="gunImg" src="pictures/gun.png"
-      /></span>
-      <span class="gun gunBefore"
-        ><img class="gunImg" src="pictures/gun.png"
-      /></span>
     </div>
   </div>
   <div id="div2Resize">
@@ -192,12 +196,12 @@
       >
 
       <span class="game-buttons-div" style="white-space: nowrap">
-        <button class="btn btn-success" id="green-button">Start!</button>
+        <button class="btn btn-game btn-game-primary" id="green-button">Start!</button>
 
         <!-- Trigger the modal with a button -->
         <button
           type="button"
-          class="btn btn-default hidden"
+          class="btn btn-game btn-game-secondary hidden"
           data-toggle="modal"
           data-target="#roleOptionsModal"
           id="options-button"
@@ -205,7 +209,7 @@
           <span class="glyphicon glyphicon-cog" aria-hidden="true"></span>
         </button>
 
-        <button class="btn btn-danger" id="red-button">
+        <button class="btn btn-game btn-game-danger" id="red-button">
           <span class="glyphicon glyphicon-remove"></span>
         </button>
       </span>

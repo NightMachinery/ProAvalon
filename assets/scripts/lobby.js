@@ -95,17 +95,20 @@ setInterval(() => {
 
   const setGameTimer = (string) => {
     const gameTimer = $('.gameTimer')[0];
+    if (!gameTimer) {
+      return;
+    }
+
     gameTimer.innerText = string;
 
+    let isUrgent = false;
     if (string !== emptyTime) {
       const mins = parseInt(string.slice(0, 2), 10);
       const secs = parseInt(string.slice(-2), 10);
-      if (mins === 0 && secs < 30) {
-        gameTimer.style.backgroundColor = 'rgba(255,0,0,0.8)';
-      } else {
-        gameTimer.style.backgroundColor = '';
-      }
+      isUrgent = mins === 0 && secs < 30;
     }
+
+    gameTimer.classList.toggle('badge-game--urgent', isUrgent);
   }
 
   if (gameData && gameData.dateTimerExpires) {
@@ -488,72 +491,56 @@ function enableSelectAvatars(prohibitedIndexesToPicks) {
 }
 
 function drawMiddleBoxes() {
-  // draw missions and numPick
-  // j<5 because there are only 5 missions/picks each game
+  const missionBoxes = document.querySelectorAll('.missionBox');
+  const pickBoxes = document.querySelectorAll('.pickBox');
+
   if (gameData) {
+    const currentMissionIndex = Math.min(gameData.missionHistory.length, 4);
+
     for (let i = 0; i < 5; i++) {
-      // missions
+      const missionBox = missionBoxes[i];
+      const pickBox = pickBoxes[i];
       const missionStatus = gameData.missionHistory[i];
+
+      missionBox.classList.remove('missionBoxSucceed', 'missionBoxFail', 'missionBoxCurrent');
+
       if (missionStatus === 'succeeded') {
-        document
-          .querySelectorAll('.missionBox')
-        [i].classList.add('missionBoxSucceed');
-        document
-          .querySelectorAll('.missionBox')
-        [i].classList.remove('missionBoxFail');
+        missionBox.classList.add('missionBoxSucceed');
       } else if (missionStatus === 'failed') {
-        document
-          .querySelectorAll('.missionBox')
-        [i].classList.add('missionBoxFail');
-        document
-          .querySelectorAll('.missionBox')
-        [i].classList.remove('missionBoxSucceed');
+        missionBox.classList.add('missionBoxFail');
+      } else if (i === currentMissionIndex) {
+        missionBox.classList.add('missionBoxCurrent');
       }
 
-      // draw in the number of players in each mission
       const numPlayersOnMission = gameData.numPlayersOnMission[i];
-      if (numPlayersOnMission)
-      {
+      if (numPlayersOnMission) {
         const numPlayersInGame = gameData.playerUsernamesOrdered.length;
+        const numToInsert =
+          numPlayersInGame >= 7 && i === 3
+            ? `${numPlayersOnMission.toString()}*`
+            : numPlayersOnMission.toString();
 
-        let numToInsert = '';
-        if (numPlayersInGame >= 7 && i === 3) {
-          numToInsert = numPlayersOnMission.toString() + '*';
-        } else {
-          numToInsert = numPlayersOnMission.toString();
-        }
-
-        document.querySelectorAll('.missionBox')[i].innerHTML = `<p>${numToInsert}</p>`;
-      }
-      else {
-        document.querySelectorAll('.missionBox')[i].innerHTML = `<p></p>`;
-      }
-
-      // picks boxes
-      const { pickNum } = gameData;
-      if (i < pickNum) {
-        document.querySelectorAll('.pickBox')[i].classList.add('pickBoxFill');
+        missionBox.innerHTML = `<p>${numToInsert}</p>`;
       } else {
-        document
-          .querySelectorAll('.pickBox')
-        [i].classList.remove('pickBoxFill');
+        missionBox.innerHTML = `<p></p>`;
+      }
+
+      if (i < gameData.pickNum) {
+        pickBox.classList.add('pickBoxFill');
+      } else {
+        pickBox.classList.remove('pickBoxFill');
       }
     }
   } else {
-    for (var j = 0; j < 5; j++) {
-      document
-        .querySelectorAll('.missionBox')
-      [j].classList.remove('missionBoxFail');
-      document
-        .querySelectorAll('.missionBox')
-      [j].classList.remove('missionBoxSucceed');
-      document.querySelectorAll('.missionBox')[j].innerText = '';
-      document.querySelectorAll('.pickBox')[j].classList.remove('pickBoxFill');
+    for (let j = 0; j < 5; j++) {
+      missionBoxes[j].classList.remove('missionBoxFail', 'missionBoxSucceed', 'missionBoxCurrent');
+      missionBoxes[j].innerText = '';
+      pickBoxes[j].classList.remove('pickBoxFill');
     }
   }
 
-  widthOfRoom = $('#mainRoomBox').width();
-  $('#missionsBox').css('left', `${widthOfRoom / 2}px`);
+  const roomBoardWidth = $('.roomBoard').width() || $('#mainRoomBox').width();
+  $('#missionsBox').css('left', `${roomBoardWidth / 2}px`);
 }
 
 const playerDivHeightPercent = 30;
@@ -1221,6 +1208,42 @@ function getPlayerAllianceLabel(alliance) {
   return alliance === 'spy' ? 'Spy' : 'Resistance';
 }
 
+function sanitizeCssColorToken(value) {
+  if (typeof value !== 'string') {
+    return 'transparent';
+  }
+
+  const trimmedValue = value.trim();
+  if (
+    /^#[0-9a-f]{3,8}$/i.test(trimmedValue) ||
+    /^(rgb|hsl)a?\([^)]*\)$/i.test(trimmedValue)
+  ) {
+    return trimmedValue;
+  }
+
+  return 'transparent';
+}
+
+function buildAvatarActionIcon(kind) {
+  if (kind === 'chat') {
+    return `
+      <span class='avatarButtonIcon' aria-hidden='true'>
+        <svg viewBox='0 0 24 24' focusable='false'>
+          <path d='M6 7.75h12M6 12h7.5M7.5 18.25l-2.75 2v-4A4.75 4.75 0 0 1 0 11.5v-3A4.75 4.75 0 0 1 4.75 3.75h14.5A4.75 4.75 0 0 1 24 8.5v3a4.75 4.75 0 0 1-4.75 4.75H7.5Z' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' fill='none'></path>
+        </svg>
+      </span>`;
+  }
+
+  return `
+    <span class='avatarButtonIcon' aria-hidden='true'>
+      <svg viewBox='0 0 24 24' focusable='false'>
+        <circle cx='12' cy='8' r='3.25' stroke='currentColor' stroke-width='1.7' fill='none'></circle>
+        <path d='M6.25 18a5.75 5.75 0 0 1 11.5 0' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' fill='none'></path>
+        <path d='M3.5 12h2.25M18.25 12h2.25M12 3.5v2.25' stroke='currentColor' stroke-width='1.7' stroke-linecap='round'></path>
+      </svg>
+    </span>`;
+}
+
 function strOfAvatar(playerData, alliance) {
   const cardModeEnabled = isRoomPlayerCardsEnabled();
   const useOriginalAvatars =
@@ -1384,9 +1407,11 @@ function strOfAvatar(playerData, alliance) {
   const indexOfPlayer = getIndexFromUsername(playerData.username);
   var searchTerm = `player${indexOfPlayer}HighlightColour`;
   if (selectedChat[playerData.username] === true) {
-    colourToHighlightChatButton = docCookies.getItem(searchTerm);
+    colourToHighlightChatButton = sanitizeCssColorToken(
+      docCookies.getItem(searchTerm)
+    );
   } else {
-    colourToHighlightChatButton = '';
+    colourToHighlightChatButton = 'transparent';
   }
 
   const escapedUsername = escapeHtml(playerData.username);
@@ -1415,15 +1440,19 @@ function strOfAvatar(playerData, alliance) {
   )}'>`;
 
   str += "<span class='avatarOptionButtons'>";
-  str +=
-    "<span id='highlightAvatarButton' class='glyphicon glyphicon-user avatarButton'></span>";
-  str += `<span id='highlightChatButton' style='background-color: ${colourToHighlightChatButton};' class='glyphicon glyphicon glyphicon-menu-hamburger avatarButton'></span>`;
+  str += `<button type='button' id='highlightAvatarButton' class='avatarButton avatarButton--highlight-player' title='Cycle player highlight' aria-label='Cycle player highlight'>${buildAvatarActionIcon(
+    'player'
+  )}</button>`;
+  str += `<button type='button' id='highlightChatButton' class='avatarButton avatarButton--highlight-chat${
+    selectedChat[playerData.username] === true ? ' is-active' : ''
+  }' title='Highlight this player in chat' aria-label='Highlight this player in chat' style='--chat-highlight-colour: ${colourToHighlightChatButton};'>${buildAvatarActionIcon(
+    'chat'
+  )}<span class='avatarButtonAccent' aria-hidden='true'></span></button>`;
   str += '</span>';
   str += playerStateBadges;
 
-  str +=
-    '<span class="label label-success invisible approveLabel">Approve</span>';
-  str += '<span class="label label-danger invisible rejectLabel">Reject</span>';
+  str += '<span class="approveLabel invisible">Approve</span>';
+  str += '<span class="rejectLabel invisible">Reject</span>';
   str += "<span class='playerCardGlow'></span>";
   str += "<span class='playerCardInset'></span>";
   if (cardModeEnabled === true) {

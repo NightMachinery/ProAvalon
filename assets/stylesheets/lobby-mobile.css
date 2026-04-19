@@ -349,3 +349,193 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* === 2026 lobby + room polish mobile overrides === */
+@media (max-width: 767px) {
+  .lobby-container {
+    padding-bottom: var(--space-xl);
+  }
+
+  .lobby-panel-shell {
+    padding: var(--space-lg);
+  }
+
+  .lobby-mobile-tabs {
+    gap: var(--space-xs);
+    margin: 0 0 var(--space-lg);
+    padding: var(--space-xs);
+    border: 1px solid var(--border-subtle);
+    border-radius: 999px;
+    background: var(--surface-sunken);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .lobby-mobile-tab {
+    min-height: 44px;
+    border-radius: 999px;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+  }
+
+  .lobby-mobile-tab.active {
+    background: var(--surface-base);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .game-container {
+    padding-left: var(--space-md);
+    padding-right: var(--space-md);
+    padding-bottom: var(--space-md);
+  }
+
+  .room-layout-mobile .roomInfoBar {
+    position: static;
+    top: auto;
+    left: auto;
+    right: auto;
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-md);
+    background: var(--surface-overlay);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-sm);
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .room-layout-mobile .roomInfoBadges {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .room-layout-mobile #claimButton {
+    flex: 0 1 auto;
+    min-height: 2.25rem;
+  }
+
+  .room-layout-mobile .roomHeaderButtons {
+    position: static;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--surface-overlay);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .room-layout-mobile .roomHeaderButtons .btn-game {
+    min-height: 2.25rem;
+    padding-left: var(--space-sm);
+    padding-right: var(--space-sm);
+  }
+
+  #mainRoomBox.room-layout-mobile {
+    height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: var(--space-md);
+  }
+
+  #mainRoomBox.room-layout-mobile.room-layout-modern,
+  #mainRoomBox.room-layout-mobile.room-layout-legacy {
+    gap: var(--space-md);
+  }
+
+  #mainRoomBox.room-layout-mobile .playerDiv {
+    max-width: 420px;
+  }
+
+  #mainRoomBox.room-layout-mobile .avatarOptionButtons {
+    top: var(--space-md);
+    right: var(--space-md);
+    left: auto;
+    gap: var(--space-sm);
+    opacity: 1;
+  }
+
+  #mainRoomBox.room-layout-mobile .playerDiv .avatarButton,
+  #mainRoomBox.room-layout-mobile .playerDiv:hover .avatarButton,
+  #mainRoomBox.room-layout-mobile .playerDiv:focus-within .avatarButton {
+    display: inline-flex;
+    width: 2.75rem;
+    height: 2.75rem;
+    opacity: 1;
+  }
+
+  #mainRoomBox.room-layout-mobile .playerDiv .avatarButton:active {
+    transform: scale(0.95);
+  }
+
+  #mainRoomBox.room-layout-mobile.room-layout-modern .playerDiv {
+    min-height: 132px;
+    padding: var(--space-lg) var(--space-lg) calc(var(--space-lg) - 0.1rem);
+  }
+
+  #mainRoomBox.room-layout-mobile.room-layout-modern .playerCardContent {
+    gap: var(--space-md);
+    padding-top: 2.9rem;
+  }
+
+  #mainRoomBox.room-layout-mobile.room-layout-modern .username-p-card {
+    font-size: 1.125rem;
+  }
+
+  #mainRoomBox.room-layout-mobile.room-layout-modern .role-p {
+    padding: 0.35rem 0.75rem;
+  }
+
+  #mainRoomBox.room-layout-mobile.room-layout-legacy .playerDiv {
+    padding: 0.9rem 4.8rem 0.9rem 0.9rem;
+    border-radius: 12px;
+    background: var(--surface-overlay);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-md);
+  }
+
+  #mainRoomBox.room-layout-mobile.room-layout-legacy .playerLegacyContent {
+    gap: var(--space-md);
+  }
+
+  #mainRoomBox.room-layout-mobile.room-layout-legacy .playerLegacyDetails {
+    gap: var(--space-xs);
+  }
+
+  .room-layout-mobile #missionsBox {
+    top: 50%;
+    width: min(260px, calc(100% - 1.5rem));
+    padding: var(--space-sm) var(--space-md);
+    z-index: 19;
+  }
+
+  .room-layout-mobile .missionBox {
+    width: 2.65rem;
+    height: 2.65rem;
+  }
+}
+
+@media (max-width: 479px) {
+  .lobby-section-header,
+  .lobby-subsection-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .room-layout-mobile .roomInfoBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .room-layout-mobile .roomInfoBadges {
+    justify-content: flex-start;
+  }
+
+  .room-layout-mobile .roomHeaderButtons {
+    grid-template-columns: 1fr;
+  }
+}
