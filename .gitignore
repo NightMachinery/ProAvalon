@@ -9,3 +9,5 @@ out/
 package-lock.json
 .self_host/
 pnpm-debug.log*
+
+tmp/
