@@ -11,3 +11,5 @@ package-lock.json
 pnpm-debug.log*
 
 tmp/
+
+.tmp/
