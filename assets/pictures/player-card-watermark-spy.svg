@@ -1,0 +1,15 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="spyStroke" x1="60" y1="42" x2="196" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A34A3A"/>
+      <stop offset="1" stop-color="#4F1F19"/>
+    </linearGradient>
+  </defs>
+  <g opacity="0.78">
+    <path d="M128 30C172 30 206 62 220 128C206 194 172 226 128 226C84 226 50 194 36 128C50 62 84 30 128 30Z" stroke="url(#spyStroke)" stroke-width="16"/>
+    <path d="M128 78C154 78 176 98 190 128C176 158 154 178 128 178C102 178 80 158 66 128C80 98 102 78 128 78Z" stroke="#A34A3A" stroke-width="14" stroke-linejoin="round"/>
+    <circle cx="128" cy="128" r="24" fill="#A34A3A"/>
+    <path d="M158 48L172 62L98 188L74 194L82 170L158 48Z" fill="#A34A3A" opacity="0.82"/>
+    <path d="M166 40L180 54" stroke="#A34A3A" stroke-width="12" stroke-linecap="round"/>
+  </g>
+</svg>

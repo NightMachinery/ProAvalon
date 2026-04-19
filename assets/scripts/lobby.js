@@ -117,11 +117,6 @@ let gameStarted = false;
 
 let isSpectator = false;
 
-const ROOM_PLAYER_CARD_PLACEHOLDER_PATHS = {
-  res: 'pictures/player-card-placeholder-res.svg',
-  spy: 'pictures/player-card-placeholder-spy.svg',
-};
-
 const DEFAULT_LISTED_EMPTY_ROOM_TTL_MINUTES = 10;
 const DEFAULT_UNLISTED_EMPTY_ROOM_TTL_MINUTES = 72 * 60;
 
@@ -681,19 +676,19 @@ function positionPlayerCards(divs, w, h) {
 
   let cardWidth =
     (w - horizontalPadding * 2 - cardGap * (maxRowCount - 1)) / maxRowCount;
-  cardWidth = Math.min(180, cardWidth);
-  cardWidth = Math.max(78, cardWidth);
+  cardWidth = Math.min(170, cardWidth);
+  cardWidth = Math.max(84, cardWidth);
 
-  let cardHeight = Math.min(150, cardWidth * 1.15);
+  let cardHeight = Math.min(182, cardWidth * 1.32);
   if (shouldUseTwoRows) {
-    const targetMiddleGap = Math.max(52, Math.min(84, h * 0.24));
+    const targetMiddleGap = Math.max(48, Math.min(76, h * 0.22));
     const maxCardHeightForRows =
       (h - verticalPadding * 2 - targetMiddleGap) / 2;
     cardHeight = Math.min(cardHeight, maxCardHeightForRows);
   } else {
     cardHeight = Math.min(cardHeight, h - verticalPadding * 2);
   }
-  cardHeight = Math.max(82, cardHeight);
+  cardHeight = Math.max(106, cardHeight);
 
   $('#mainRoomBox').css('--room-player-card-width', `${cardWidth}px`);
   $('#mainRoomBox').css('--room-player-card-height', `${cardHeight}px`);
@@ -1185,14 +1180,20 @@ function buildPlayerStateBadge(label, modifier) {
   )}</span>`;
 }
 
+function getPlayerAllianceLabel(alliance) {
+  return alliance === 'spy' ? 'Spy' : 'Resistance';
+}
+
 function strOfAvatar(playerData, alliance) {
   const cardModeEnabled = isRoomPlayerCardsEnabled();
   const useOriginalAvatars =
     $('#option_display_original_avatars')[0].checked === true;
   const hasVisibleCustomAvatar = !playerData.avatarHide;
-  let picLink =
-    ROOM_PLAYER_CARD_PLACEHOLDER_PATHS[alliance] ||
-    ROOM_PLAYER_CARD_PLACEHOLDER_PATHS.res;
+  let picLink = 'avatars/base-res.svg';
+
+  if (alliance === 'spy') {
+    picLink = 'avatars/base-spy.svg';
+  }
 
   if (useOriginalAvatars === true) {
     picLink = alliance === 'spy' ? 'avatars/base-spy.svg' : 'avatars/base-res.svg';
@@ -1358,10 +1359,23 @@ function strOfAvatar(playerData, alliance) {
   const usernameTextClass = cardModeEnabled
     ? 'username-p username-p-card'
     : 'username-p';
+  const allianceLabel = getPlayerAllianceLabel(alliance);
+  const playerClassNames = ['playerDiv'];
 
-  let str = `<div usernameofplayer='${escapedUsername}' ${escapedAnonUsername} class='playerDiv ${selectedAvatar} ${
-    playerData.disconnected === true ? 'leftRoom' : ''
-  }'>`;
+  if (cardModeEnabled === true) {
+    playerClassNames.push('playerDiv-card', `playerAlliance-${alliance}`);
+  }
+
+  if (selectedAvatar) {
+    playerClassNames.push(selectedAvatar);
+  }
+  if (playerData.disconnected === true) {
+    playerClassNames.push('leftRoom');
+  }
+
+  let str = `<div usernameofplayer='${escapedUsername}' ${escapedAnonUsername} class='${playerClassNames.join(
+    ' '
+  )}'>`;
 
   str += "<span class='avatarOptionButtons'>";
   str +=
@@ -1375,11 +1389,22 @@ function strOfAvatar(playerData, alliance) {
   str += '<span class="label label-danger invisible rejectLabel">Reject</span>';
   str += "<span class='playerCardGlow'></span>";
   str += "<span class='playerCardInset'></span>";
-  str += "<span class='playerAvatarFrame'></span>";
-  str += '<span class="cardsContainer"></span>';
-
-  str += `<img class='avatarImgInRoom' src='${picLink}' alt='${escapedUsername}'>`;
-  str += `<p class='${usernameTextClass}'> ${escapedUsername} ${hammerStar} </p>${role}</div>`;
+  if (cardModeEnabled === true) {
+    str += `<span class='playerCardWatermark playerCardWatermark-${alliance}' aria-hidden='true'></span>`;
+    str += `<span class='playerCardAllianceLabel'>${allianceLabel}</span>`;
+    str += "<span class='playerCardDivider playerCardDivider-top' aria-hidden='true'></span>";
+    str += "<span class='playerCardDivider playerCardDivider-bottom' aria-hidden='true'></span>";
+    str += "<span class='playerCardContent'>";
+    str += `<span class='playerCardNameplate'><p class='${usernameTextClass}'> ${escapedUsername} </p>${role}</span>`;
+    str += '<span class="cardsContainer"></span>';
+    str += '</span>';
+  } else {
+    str += "<span class='playerAvatarFrame'></span>";
+    str += '<span class="cardsContainer"></span>';
+    str += `<img class='avatarImgInRoom' src='${picLink}' alt='${escapedUsername}'>`;
+    str += `<p class='${usernameTextClass}'> ${escapedUsername} ${hammerStar} </p>${role}`;
+  }
+  str += '</div>';
 
   return str;
 }
