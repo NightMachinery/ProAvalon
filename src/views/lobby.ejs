@@ -12,6 +12,16 @@
 <link
   rel="stylesheet"
   type="text/css"
+  href="<%-getVersionedPath('/stylesheets/lobby-cards.css')%>"
+/>
+<link
+  rel="stylesheet"
+  type="text/css"
+  href="<%-getVersionedPath('/stylesheets/lobby-mobile.css')%>"
+/>
+<link
+  rel="stylesheet"
+  type="text/css"
   href="<%-getVersionedPath('/libraries/jquery-ui-1.12.1/jquery-ui.min.css')%>"
 />
 
@@ -27,8 +37,29 @@
 
 <!-- <div class="container lobby-container"> -->
 <div class="container lobby-container">
-  <div class="row">
-    <div class="col-xs-6 col-sm-9" id="col1">
+  <div class="lobby-mobile-tabs" role="tablist" aria-label="Lobby sections">
+    <button
+      type="button"
+      class="lobby-mobile-tab"
+      data-target="col2"
+      aria-controls="col2"
+      aria-selected="true"
+    >
+      Games &amp; Players
+    </button>
+    <button
+      type="button"
+      class="lobby-mobile-tab"
+      data-target="col1"
+      aria-controls="col1"
+      aria-selected="false"
+    >
+      All Chat
+    </button>
+  </div>
+
+  <div class="row lobby-main-row">
+    <div class="col-xs-12 col-sm-9 lobby-mobile-panel" id="col1">
       <div style="position: relative">
         <strong>
           <span id="all-chat-lobby-text"> All Chat </span>
@@ -56,7 +87,7 @@
       <input type="text" class="chat-message-input all-chat-message-input" />
     </div>
 
-    <div class="col-xs-6 col-sm-3" id="col2">
+    <div class="col-xs-12 col-sm-3 lobby-mobile-panel active" id="col2">
       <!-- <br> -->
       <strong>
         <p>Games (<span class="games-count">0</span>):</p>
@@ -98,21 +129,24 @@
   <!-- container -->
   <div id="div1Resize">
     <div class="room-container">
+      <div class="roomInfoBar">
+        <button id="claimButton" class="disabled btn btn-primary">Claim</button>
+
+        <div class="roomInfoBadges">
+          <div class="gameInfoMaxPlayers badge">8/9</div>
+          <div class="gameTimer badge">--:--</div>
+        </div>
+      </div>
+
+      <div id="mainRoomBox" class="">
+        <p></p>
+      </div>
       <div class="roomHeaderButtons">
         <button id="backButton" class="btn btn-warning">Back</button>
         <button id="copyRoomLinkButton" class="btn btn-info">Copy link</button>
         <button id="restartRoomButton" class="btn btn-warning hidden">
           Restart lobby
         </button>
-      </div>
-
-      <button id="claimButton" class="disabled btn btn-primary">Claim</button>
-
-      <div class="gameInfoMaxPlayers badge">8/9</div>
-      <div class="gameTimer badge">--:--</div>
-
-      <div id="mainRoomBox" class="">
-        <p></p>
       </div>
       <div id="missionsBox" class="invisible">
         <div class="row">
@@ -178,7 +212,7 @@
     </div>
 
     <div id="tabContainerBig">
-      <div id="tabs1" class="">
+      <div id="tabs1" class="room-tabs-column">
         <ul class="nav nav-tabs">
           <li id="all-chat-in-game-tab">
             <a data-toggle="tab" href="#all-chat-in-game">All Chat</a>
@@ -558,7 +592,7 @@
         </div>
       </div>
 
-      <div id="tabs2" class="col-xs-6 displayNoneClass">
+      <div id="tabs2" class="col-xs-6 displayNoneClass room-tabs-column">
         <ul class="nav nav-tabs">
           <li id="all-chat-in-game-tab">
             <a data-toggle="tab" href="#all-chat-in-game2">All Chat</a>
@@ -1332,6 +1366,10 @@
   src="<%-getVersionedPath('/scripts/lobby/pics.js')%>"
 ></script>
 
+<script
+  type="text/javascript"
+  src="<%-getVersionedPath('/scripts/lobby/layout.js')%>"
+></script>
 <script
   type="text/javascript"
   src="<%-getVersionedPath('/scripts/lobby.js')%>"

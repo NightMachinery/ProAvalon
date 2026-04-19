@@ -1,0 +1,121 @@
+:root {
+  --room-player-card-width: 150px;
+  --room-player-card-height: 152px;
+  --room-player-card-gap: 14px;
+  --room-grid-columns: 4;
+  --room-grid-max-width: 760px;
+}
+
+.room-container {
+  position: relative;
+}
+
+.roomInfoBar {
+  position: absolute;
+  top: 5px;
+  right: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.roomInfoBadges {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.roomInfoBar .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.75rem;
+  padding: 0.4rem 0.65rem;
+}
+
+#claimButton,
+#backButton {
+  position: static;
+}
+
+#mainRoomBox.room-layout-desktop.room-layout-modern {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  gap: var(--room-player-card-gap);
+  max-width: min(100%, var(--room-grid-max-width));
+  margin: 0 auto;
+  padding: 4.5rem 1rem 1rem;
+  overflow: hidden;
+}
+
+#mainRoomBox.room-layout-desktop.room-layout-modern .playerDiv {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  flex: 0 0 var(--room-player-card-width);
+  width: var(--room-player-card-width);
+  height: var(--room-player-card-height);
+}
+
+#mainRoomBox.room-layout-desktop.room-layout-modern .playerDiv:hover,
+#mainRoomBox.room-layout-desktop.room-layout-modern .playerDiv:focus-within {
+  transform: translateY(-2px);
+}
+
+#mainRoomBox.room-player-cards-enabled .username-p-card {
+  font-size: clamp(0.875rem, 2vw, 1.125rem);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+#mainRoomBox.room-player-cards-enabled .playerCardAllianceLabel {
+  font-size: clamp(0.625rem, 1.2vw, 0.78rem);
+}
+
+#mainRoomBox.room-player-cards-enabled .playerCardNameplate .label,
+#mainRoomBox.room-player-cards-enabled .role-p {
+  font-size: clamp(0.72rem, 1vw, 0.875rem);
+  padding: 0.3rem 0.65rem;
+}
+
+#mainRoomBox.room-player-cards-enabled .avatarOptionButtons {
+  gap: 0.38rem;
+}
+
+#mainRoomBox.room-layout-desktop.room-layout-modern .playerDiv .avatarButton {
+  width: 1.9rem;
+  height: 1.9rem;
+}
+
+.playerLegacyContent {
+  display: contents;
+}
+
+.playerLegacyDetails {
+  display: contents;
+}
+
+.room-layout-desktop .roomHeaderButtons {
+  position: absolute;
+  top: 5px;
+  left: 0;
+  display: flex;
+  gap: 8px;
+  z-index: 12;
+}
+
+.room-layout-desktop #missionsBox {
+  z-index: 10;
+}
+
+.room-layout-desktop .roomInfoBar,
+.room-layout-desktop .roomHeaderButtons {
+  padding: 0.15rem;
+}
+
+.dark .roomInfoBar {
+  background: transparent;
+}

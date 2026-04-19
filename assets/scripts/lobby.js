@@ -13,22 +13,82 @@ const buttons = {
   claim: '#claimButton',
 };
 
-setInterval(() => {
-  extendTabContentToBottomInRoom();
+const responsiveLayoutHelpers = window.ProAvalonLobbyLayout || {};
+let responsiveLayoutTimeout;
 
-  // Extend the div1resize box to be full width
-  // if the difference between the widths is close enough to 0, then change width
-  if (
-    Math.abs(
-      $('#div1Resize').width() - $('#div1Resize').parent().width() * 0.95
-    ) > 1
-  ) {
-    // console.log('Changed width:');
-    $('#div1Resize').width($('#div1Resize').parent().width());
-    draw();
-    draw();
+function isMobileViewport() {
+  return (
+    responsiveLayoutHelpers.isMobileViewport &&
+    responsiveLayoutHelpers.isMobileViewport()
+  );
+}
+
+function syncGamePaneLayout() {
+  const resizeParent = $('#div1Resize').parent();
+  if (!resizeParent[0]) {
+    return;
   }
-}, 1000);
+
+  const parentWidth = resizeParent.width();
+  if (parentWidth && Math.abs($('#div1Resize').width() - parentWidth) > 1) {
+    $('#div1Resize').width(parentWidth);
+  }
+
+  if (isMobileViewport()) {
+    const mobileRoomHeight = Math.max(
+      260,
+      Math.min(Math.round(window.innerHeight * 0.38), 420)
+    );
+    $('#div1Resize').height(mobileRoomHeight);
+  } else {
+    const storedHeight = parseInt(
+      docCookies.getItem('optionDisplayHeightOfAvatarContainer'),
+      10
+    );
+    if (!Number.isNaN(storedHeight) && storedHeight > 0) {
+      $('#div1Resize').height(storedHeight);
+    }
+  }
+
+  $('#div2Resize').height(
+    Math.max(0, resizeParent.height() - $('#div1Resize').height())
+  );
+
+  if ($('#div1Resize').hasClass('ui-resizable')) {
+    try {
+      $('#div1Resize').resizable(isMobileViewport() ? 'disable' : 'enable');
+    } catch (error) {
+      // Ignore until the resizable widget is fully initialised.
+    }
+  }
+}
+
+function refreshResponsiveLayout(redraw = false) {
+  if (responsiveLayoutHelpers.applyResponsiveState) {
+    responsiveLayoutHelpers.applyResponsiveState();
+  }
+
+  syncGamePaneLayout();
+  updateTwoTabs(docCookies.getItem('optionDisplayTwoTabs') === 'true');
+  extendTabContentToBottomInRoom();
+  checkStatusBarWithHeight();
+
+  if (redraw === true && roomPlayersData) {
+    draw();
+  } else if (responsiveLayoutHelpers.applyRoomLayoutClasses) {
+    responsiveLayoutHelpers.applyRoomLayoutClasses(
+      isRoomPlayerCardsEnabled(),
+      getRoomPlayerDivs().length
+    );
+  }
+}
+
+function scheduleResponsiveLayoutRefresh(redraw = false, delay = 0) {
+  clearTimeout(responsiveLayoutTimeout);
+  responsiveLayoutTimeout = setTimeout(() => {
+    refreshResponsiveLayout(redraw);
+  }, delay);
+}
 
 setInterval(() => {
   const emptyTime = '--:--';
@@ -80,28 +140,13 @@ setInterval(() => {
   }
 }, 100);
 
-// Prevents the window height from changing when android keyboard is pulled up.
-setTimeout(() => {
-  const viewheight = $(window).height();
-  const viewwidth = $(window).width();
-  const viewport = document.querySelector('meta[name=viewport]');
-  viewport.setAttribute(
-    'content',
-    `height=${viewheight}, width=${viewwidth}, initial-scale=1.0`
-  );
-
-  // Extend divs to bottom of page:
-  // All chat in lobby
-  const parentH = $('#col1')[0].offsetHeight;
-  const textH = $('#all-chat-lobby-text')[0].offsetHeight;
-  const inputH = $('.all-chat-message-input')[0].offsetHeight;
-  const newHeight = parentH - textH - inputH;
-  // $("#all-chat-lobby")[0].style.height = (newHeight - 10) + "px";
-}, 300);
-
-// when the navbar is closed, re-exted the tab content to bottom.
+// when the navbar is closed, re-extend the tab content to bottom.
 $('.navbar-collapse').on('hidden.bs.collapse', () => {
-  extendTabContentToBottomInRoom();
+  scheduleResponsiveLayoutRefresh(false, 10);
+});
+
+window.addEventListener('load', () => {
+  scheduleResponsiveLayoutRefresh(false, 50);
 });
 
 // for the game
@@ -203,12 +248,9 @@ function getRoomPlayerDiv(index) {
   return getRoomPlayerDivs()[index];
 }
 
-// window resize, repaint the users
+// window resize, refresh responsive layout and repaint room users when needed.
 window.addEventListener('resize', () => {
-  // console.log("Resized");
-
-  checkStatusBarWithHeight();
-  draw();
+  scheduleResponsiveLayoutRefresh(Boolean(roomPlayersData), 25);
 });
 
 //= =====================================
@@ -515,6 +557,17 @@ function drawMiddleBoxes() {
 }
 
 const playerDivHeightPercent = 30;
+
+function resetPlayerDivInlineLayout(divs) {
+  divs.forEach((div) => {
+    div.style.left = '';
+    div.style.bottom = '';
+    div.style.width = '';
+    div.style.height = '';
+    div.style.transform = '';
+  });
+}
+
 function drawAndPositionAvatars() {
   const w = $('#mainRoomBox').width();
   const h = $('#mainRoomBox').height();
@@ -551,9 +604,10 @@ function drawAndPositionAvatars() {
 
   // set the divs into the box
   $('#mainRoomBox').html(str);
+  const roomPlayerCardsEnabled = isRoomPlayerCardsEnabled();
   $('#mainRoomBox').toggleClass(
     'room-player-cards-enabled',
-    isRoomPlayerCardsEnabled()
+    roomPlayerCardsEnabled
   );
 
   //= ==============================================
@@ -562,9 +616,23 @@ function drawAndPositionAvatars() {
 
   // set the positions and sizes
   // console.log("numPlayers: " + numPlayers)
-  const divs = getRoomPlayerDivs();
+  const divs = Array.from(getRoomPlayerDivs());
+  const roomLayoutMode = responsiveLayoutHelpers.applyRoomLayoutClasses
+    ? responsiveLayoutHelpers.applyRoomLayoutClasses(
+        roomPlayerCardsEnabled,
+        numPlayers
+      )
+    : roomPlayerCardsEnabled
+    ? 'desktop-modern'
+    : 'desktop-legacy';
 
-  if (isRoomPlayerCardsEnabled()) {
+  resetPlayerDivInlineLayout(divs);
+
+  if (roomLayoutMode === 'mobile-modern' || roomLayoutMode === 'mobile-legacy') {
+    return;
+  }
+
+  if (roomLayoutMode === 'desktop-modern') {
     positionPlayerCards(divs, w, h);
     return;
   }
@@ -665,70 +733,39 @@ function positionPlayerCards(divs, w, h) {
     return;
   }
 
+  const columns = responsiveLayoutHelpers.getDesktopCardColumns
+    ? responsiveLayoutHelpers.getDesktopCardColumns(numPlayers)
+    : Math.min(numPlayers, 5);
+  const cardGap = Math.max(10, Math.min(18, w * 0.015));
   const horizontalPadding = Math.max(12, Math.min(32, w * 0.035));
-  const cardGap = Math.max(8, Math.min(18, w * 0.015));
   const verticalPadding = Math.max(10, Math.min(24, h * 0.06));
-  const shouldUseTwoRows = numPlayers >= 5;
-  const rows = shouldUseTwoRows
-    ? [Math.ceil(numPlayers / 2), Math.floor(numPlayers / 2)]
-    : [numPlayers];
-  const maxRowCount = Math.max(...rows);
+  const rowCount = numPlayers >= 5 ? 2 : 1;
 
   let cardWidth =
-    (w - horizontalPadding * 2 - cardGap * (maxRowCount - 1)) / maxRowCount;
-  cardWidth = Math.min(170, cardWidth);
-  cardWidth = Math.max(84, cardWidth);
+    (w - horizontalPadding * 2 - cardGap * Math.max(columns - 1, 0)) /
+    Math.max(columns, 1);
+  cardWidth = Math.min(170, Math.max(120, cardWidth));
 
   let cardHeight = Math.min(182, cardWidth * 1.32);
-  if (shouldUseTwoRows) {
-    const targetMiddleGap = Math.max(48, Math.min(76, h * 0.22));
-    const maxCardHeightForRows =
-      (h - verticalPadding * 2 - targetMiddleGap) / 2;
+  if (rowCount === 2) {
+    const maxCardHeightForRows = (h - verticalPadding * 2 - cardGap) / 2;
     cardHeight = Math.min(cardHeight, maxCardHeightForRows);
-  } else {
-    cardHeight = Math.min(cardHeight, h - verticalPadding * 2);
   }
-  cardHeight = Math.max(106, cardHeight);
+  cardHeight = Math.max(140, cardHeight);
 
+  const maxGridWidth = columns * cardWidth + Math.max(columns - 1, 0) * cardGap;
+
+  $('#mainRoomBox').css('--room-grid-columns', `${columns}`);
+  $('#mainRoomBox').css('--room-grid-max-width', `${maxGridWidth}px`);
   $('#mainRoomBox').css('--room-player-card-width', `${cardWidth}px`);
   $('#mainRoomBox').css('--room-player-card-height', `${cardHeight}px`);
-
-  let playerIndex = 0;
-  rows.forEach((rowCount, rowIndex) => {
-    if (rowCount <= 0) {
-      return;
-    }
-
-    const rowWidth = rowCount * cardWidth + (rowCount - 1) * cardGap;
-    const startLeft = (w - rowWidth) / 2;
-    const rowBottom = shouldUseTwoRows
-      ? rowIndex === 0
-        ? h - verticalPadding - cardHeight
-        : verticalPadding
-      : (h - cardHeight) / 2;
-
-    for (let i = 0; i < rowCount; i++) {
-      const div = divs[playerIndex];
-      if (!div) {
-        playerIndex++;
-        continue;
-      }
-
-      div.style.left = `${startLeft + i * (cardWidth + cardGap)}px`;
-      div.style.bottom = `${rowBottom}px`;
-      div.style.width = `${cardWidth}px`;
-      div.style.height = `${cardHeight}px`;
-      div.style.transform = '';
-
-      playerIndex++;
-    }
-  });
+  $('#mainRoomBox').css('--room-player-card-gap', `${cardGap}px`);
 }
 
 let lastPickNum = 0;
 let lastMissionNum = 0;
 function drawGuns() {
-  if (isRoomPlayerCardsEnabled()) {
+  if (isRoomPlayerCardsEnabled() || isMobileViewport()) {
     $('.gun').css('visibility', 'hidden');
     $('.gun').removeClass('gunAfter');
     $('.gun').addClass('gunBefore');
@@ -1400,9 +1437,13 @@ function strOfAvatar(playerData, alliance) {
     str += '</span>';
   } else {
     str += "<span class='playerAvatarFrame'></span>";
-    str += '<span class="cardsContainer"></span>';
+    str += "<span class='playerLegacyContent'>";
     str += `<img class='avatarImgInRoom' src='${picLink}' alt='${escapedUsername}'>`;
+    str += "<span class='playerLegacyDetails'>";
     str += `<p class='${usernameTextClass}'> ${escapedUsername} ${hammerStar} </p>${role}`;
+    str += '<span class="cardsContainer"></span>';
+    str += '</span>';
+    str += '</span>';
   }
   str += '</div>';
 
@@ -1413,12 +1454,7 @@ function changeView() {
   $('.lobby-container').toggleClass('inactive-window');
   $('.game-container').toggleClass('inactive-window');
 
-  extendTabContentToBottomInRoom();
-
-  setTimeout(() => {
-    // console.log("redraw");
-    draw();
-  }, 1000);
+  scheduleResponsiveLayoutRefresh(Boolean(roomPlayersData), 120);
 }
 
 // var chatBoxToNavTab = {
@@ -1869,32 +1905,30 @@ function resetGameToWaitingLobby() {
 let tempVar = 0;
 
 const gameContainer = $('.game-container')[0];
-const tabNumber = $('#tabs1');
-const tabContainer = $('.tab-content');
-const navTabs = $('.nav-tabs');
 
 function extendTabContentToBottomInRoom() {
-  // extending the tab content to the bottom of the page:
-
-  // 20 pixel diff for navbar
-
-  if ($('#tabs1 .nav').height() > 40) {
-    // console.log("ASDF");
-    tempVar = 37;
-  } else {
-    tempVar = 0;
+  if (!gameContainer || !gameContainer.offsetHeight) {
+    return;
   }
 
-  const newHeight2 =
-    Math.floor(gameContainer.offsetHeight - tabNumber.position().top) -
-    20 -
-    tempVar;
-  // console.log("h: " + newHeight2);
-  // console.log("new height 2: " + newHeight2);
+  document.querySelectorAll('.room-tabs-column').forEach((tabColumn) => {
+    if (window.getComputedStyle(tabColumn).display === 'none') {
+      return;
+    }
 
-  tabNumber[0].style.height = `${Math.floor(newHeight2 * 1)}px`;
+    const $tabColumn = $(tabColumn);
+    const navHeight = $tabColumn.find('.nav').first().height() || 0;
+    tempVar = navHeight > 40 ? 37 : 0;
 
-  tabContainer.height(`${Math.floor(newHeight2 /* - navTabs.height() */)}px`);
+    const columnTop = $tabColumn.position().top || 0;
+    const nextHeight = Math.max(
+      220,
+      Math.floor(gameContainer.offsetHeight - columnTop) - 20 - tempVar
+    );
+
+    tabColumn.style.height = `${nextHeight}px`;
+    $tabColumn.find('.tab-content').height(`${nextHeight}`);
+  });
 }
 
 let lastChatBoxCommand = '';
@@ -2048,21 +2082,23 @@ function updateDarkTheme(checked) {
 }
 
 function updateTwoTabs(checked) {
-  if (checked === true) {
-    $('#tabs1').addClass('col-xs-6');
-    $('#tabs1').addClass('tabs1TwoTabs');
-    $('#tabs2').addClass('tabs2TwoTabs');
-    $('#tabs2').removeClass('displayNoneClass');
-    $('#reportDivRoom').addClass('displayNoneReportClass')
-  } else {
-    $('#tabs1').removeClass('col-xs-6');
-    $('#tabs2').addClass('displayNoneClass');
-    $('#reportDivRoom').removeClass('displayNoneReportClass')
-  }
+  const enabled = checked === true && isMobileViewport() === false;
+
+  $('#tabs1').toggleClass('col-xs-6', enabled);
+  $('#tabs1').toggleClass('tabs1TwoTabs', enabled);
+  $('#tabs2').toggleClass('tabs2TwoTabs', enabled);
+  $('#tabs2').toggleClass('displayNoneClass', enabled === false);
+  $('#reportDivRoom').toggleClass('displayNoneReportClass', enabled);
+
+  extendTabContentToBottomInRoom();
 }
 
 function updateRoomPlayerCards(checked) {
   $('#mainRoomBox').toggleClass('room-player-cards-enabled', checked === true);
+
+  if (responsiveLayoutHelpers.applyRoomLayoutClasses) {
+    responsiveLayoutHelpers.applyRoomLayoutClasses(checked === true, getRoomPlayerDivs().length);
+  }
 
   if (roomPlayersData) {
     draw();
