@@ -7,6 +7,7 @@ import { Phase } from '../phases/types';
 import { Alliance } from '../types';
 import { Card } from '../cards/types';
 import { Role } from '../roles/types';
+import GameRecord from '../../../models/gameRecord';
 
 jest.mock('../gameWrapper');
 jest.mock('../../../models/gameRecord');
@@ -421,6 +422,75 @@ describe('Game Engine', () => {
         errMessage:
           'Cannot start a game with both Assassin and MordredAssassin',
       });
+    });
+  });
+
+  describe('Bot support', () => {
+    it('downgrades a ranked room when standalone bots are added', () => {
+      game.ranked = true;
+
+      const result = game.addStandaloneBots(2, '1');
+
+      expect(result.success).toEqual(true);
+      expect(game.botUsed).toEqual(true);
+      expect(game.ranked).toEqual(false);
+      expect(game.socketsOfPlayers).toHaveLength(2);
+      expect(game.socketsOfPlayers[0].isBotSocket).toEqual(true);
+      expect(game.socketsOfPlayers[0].botSeatMode).toEqual('standalone');
+    });
+
+    it('allows a disconnected player seat to be handed to a bot and manually restored', () => {
+      startGame(6, []);
+
+      const targetUsername = game.playersInGame[0].username;
+      const targetSocket = testSockets.find(
+        (socket) => socket.request.user.username === targetUsername,
+      );
+
+      game.playerLeaveRoom(targetSocket);
+
+      const takeoverResult = game.takeOverSeatWithBot(targetUsername, '1');
+      expect(takeoverResult.success).toEqual(true);
+      expect(game.isBotControlledUsername(targetUsername)).toEqual(true);
+
+      const controlledSeat = game.getSeatSocketByUsername(targetUsername);
+      expect(controlledSeat.isBotSocket).toEqual(true);
+      expect(controlledSeat.botSeatMode).toEqual('takeover');
+
+      game.playerJoinRoom(targetSocket, password);
+      expect(game.isAwaitingHumanRestore(targetUsername)).toEqual(true);
+      expect(game.getSeatSocketByUsername(targetUsername).isBotSocket).toEqual(
+        true,
+      );
+
+      const restoreResult = game.restoreHumanSeat(targetUsername, '1');
+      expect(restoreResult.success).toEqual(true);
+      expect(game.isBotControlledUsername(targetUsername)).toEqual(false);
+      expect(game.isAwaitingHumanRestore(targetUsername)).toEqual(false);
+      expect(game.getSeatSocketByUsername(targetUsername)).toBe(targetSocket);
+    });
+
+    it('stores bot metadata on finished games', () => {
+      startGame(6, []);
+
+      const targetUsername = game.playersInGame[0].username;
+      const targetSocket = testSockets.find(
+        (socket) => socket.request.user.username === targetUsername,
+      );
+
+      game.playerLeaveRoom(targetSocket);
+      game.takeOverSeatWithBot(targetUsername, '1');
+      game.winner = Alliance.Resistance;
+      (game as any).howWasWon = 'Test outcome';
+      game.finishGame(Alliance.Resistance);
+
+      expect(GameRecord.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          botUsed: true,
+          botControlledSeats: [targetUsername.toLowerCase()],
+        }),
+        expect.any(Function),
+      );
     });
   });
 });

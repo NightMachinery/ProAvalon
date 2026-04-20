@@ -1,64 +1,48 @@
-# Game modes
+# Game modes and bot support
 
-## Current state
+## Current public mode
 
-The UI shows a **Game Mode** dropdown when creating a room, but only **Avalon** is currently available.
+The public room flow still exposes **Avalon** as the normal game mode.
 
-This is because the dropdown is populated from the server-side `GAME_MODE_NAMES` list, and that list currently only exposes `avalon`:
+The older internal `avalonBot` identifier still exists in code for legacy
+compatibility, but public bot usage no longer depends on choosing a separate
+game mode.
 
-- `src/gameplay/gameEngine/gameModes.ts`
-- `src/sockets/sockets.ts`
-- `assets/scripts/lobby/sockets/sockets.js`
+## Public bot model
 
-## Implemented game mode identifiers
+Bots are now a **room capability**, not a separate ruleset.
 
-The code defines two game mode identifiers:
+That means:
 
-- `avalon`
-- `avalonBot`
+- the game still runs normal Avalon rules
+- hosts can add **SimpleBot** seats before a game starts
+- hosts can hand an absent player seat over to **SimpleBot** during a game
+- reconnecting players can be restored back to human control by the host
 
-However, only `avalon` is included in the public `GAME_MODE_NAMES` list. As a result, only **Avalon** appears in the room creation UI.
+## Ranked behavior
 
-## What `avalonBot` is
+Bot support is available so rooms do not die when someone leaves, but the room
+is no longer treated as competitive once a bot is used.
 
-`avalonBot` is **not a separate ruleset** from Avalon.
+On the first bot add or seat takeover:
 
-It is best understood as:
+- the room is downgraded to **unranked**
+- it stays unranked until the room is restarted
+- bot-involved games are excluded from rating/stat updates and bot-free stats
 
-- **Avalon with bot support enabled**
-- **unranked-only**
-- intended for bot-capable / test-style rooms
+## UI and commands
 
-When a room is switched into bot mode, the room still reloads the normal Avalon roles, phases, and cards. In other words, it does **not** load a different game family.
+Hosts can manage bots through:
 
-Relevant files:
+- the in-room **Bots** modal
+- slash commands:
+  - `/addbot`
+  - `/rembot`
+  - `/takebot`
+  - `/restorehuman`
 
-- `src/gameplay/gameEngine/gameModes.ts`
-- `src/gameplay/gameEngine/room.ts`
-- `src/gameplay/gameEngine/game.ts`
-- `src/sockets/bot.js`
+## Algorithm reference
 
-## What bots actually do
+The current public bot behavior is documented in:
 
-The codebase contains bot infrastructure:
-
-- `SimpleBot` exists and plays randomly.
-- There is also support for API-driven bots.
-- During games, bot players can be asked to initialize, make moves, and leave when the game ends.
-
-## Why `avalonBot` is not exposed today
-
-Although `avalonBot` exists in code, it appears to be intentionally hidden / dormant as a user-facing feature:
-
-- it is not included in `GAME_MODE_NAMES`
-- old user bot commands in `src/sockets/bot.js` are commented out
-- the admin `/atestgame` path currently returns **"Bots are disabled."** before doing any setup
-
-So enabling `avalonBot` in the dropdown alone would not create a complete public feature. It would expose a bot-capable Avalon room type, but the current codebase does not expose a normal user workflow for adding or managing bots from the UI.
-
-## Short answer
-
-- The dropdown currently only shows **Avalon** because that is the only public mode enabled.
-- The only other defined mode is **`avalonBot`**.
-- `avalonBot` is **Avalon with bot support**, not a different game.
-- Bot support appears to be **partially implemented but currently disabled / hidden** for normal users.
+- `docs/bots/algorithm.md`

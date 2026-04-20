@@ -185,6 +185,15 @@
         <button id="backButton" class="btn btn-game btn-game-secondary">
           Back
         </button>
+        <button
+          id="botControlsButton"
+          class="btn btn-game btn-game-secondary hidden"
+          type="button"
+          data-toggle="modal"
+          data-target="#botControlModal"
+        >
+          Bots
+        </button>
         <button id="copyRoomLinkButton" class="btn btn-game btn-game-secondary">
           Copy link
         </button>
@@ -1069,6 +1078,64 @@
         <br />
         <label>Show room in main list:</label>
         <input type="checkbox" name="listedInLobby" class="listedInLobby" checked />
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal for bot controls -->
+<div id="botControlModal" class="modal fade" role="dialog">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">
+          &times;
+        </button>
+        <h2 class="modal-title">Bot controls</h2>
+      </div>
+      <div class="modal-body">
+        <p>
+          Host-only controls for adding SimpleBot seats, rescuing absent players,
+          and restoring reconnected players.
+        </p>
+
+        <div class="form-group">
+          <label for="botAddCount">Add standalone SimpleBots</label>
+          <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <input
+              id="botAddCount"
+              type="number"
+              min="1"
+              max="10"
+              value="1"
+              class="form-control"
+              style="max-width: 7rem;"
+            />
+            <button type="button" class="btn btn-primary" id="botAddButton">
+              Add bot
+            </button>
+            <button type="button" class="btn btn-danger" id="botRemoveAllButton">
+              Remove all standalone bots
+            </button>
+          </div>
+        </div>
+
+        <hr />
+
+        <h4>Seats</h4>
+        <div id="botControlSeatList"></div>
+
+        <hr />
+
+        <p class="text-muted">
+          Slash commands: <code>/addbot</code>, <code>/rembot</code>,
+          <code>/takebot</code>, <code>/restorehuman</code>
+        </p>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">

@@ -1119,6 +1119,7 @@ function enableDisableButtons() {
   document.querySelector(buttons.green).classList.add('hidden');
   document.querySelector(buttons.red).classList.add('hidden');
   document.querySelector('#restartRoomButton').classList.add('hidden');
+  document.querySelector('#botControlsButton').classList.add('hidden');
   // Claim button is never hidden, only disabled
   // document.querySelector(buttons["claim"]).classList.add("hidden");
 
@@ -1222,6 +1223,10 @@ function enableDisableButtons() {
       document.querySelector('#restartRoomButton').innerText = 'Cancel game';
     }
   }
+
+  if (isCurrentUserHost()) {
+    document.querySelector('#botControlsButton').classList.remove('hidden');
+  }
 }
 
 function checkEntryExistsInArray(array, entry) {
@@ -1301,6 +1306,10 @@ function buildRoomGlyph(kind) {
       return "<svg viewBox='0 0 24 24' focusable='false'><path d='M6.5 20V4.25M7.25 5.25h8.75l-1.75 3 1.75 3H7.25' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' fill='none'></path></svg>";
     case 'team':
       return "<svg viewBox='0 0 24 24' focusable='false'><circle cx='8' cy='9' r='2.25' stroke='currentColor' stroke-width='1.7' fill='none'></circle><circle cx='16.25' cy='8' r='1.85' stroke='currentColor' stroke-width='1.7' fill='none'></circle><path d='M4.75 17.75a3.75 3.75 0 0 1 6.5-2.5M14 17.25l2 2 4-4' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' fill='none'></path></svg>";
+    case 'bot':
+      return "<svg viewBox='0 0 24 24' focusable='false'><rect x='6.25' y='7.25' width='11.5' height='9.5' rx='2' stroke='currentColor' stroke-width='1.7' fill='none'></rect><circle cx='10' cy='12' r='1' fill='currentColor'></circle><circle cx='14' cy='12' r='1' fill='currentColor'></circle><path d='M12 4.25v2.5M9 16.75v2M15 16.75v2M4.75 10.5h1.5M17.75 10.5h1.5' stroke='currentColor' stroke-width='1.7' stroke-linecap='round'></path></svg>";
+    case 'restore':
+      return "<svg viewBox='0 0 24 24' focusable='false'><path d='M7 7.5H4.5V5M4.5 7.5A7.5 7.5 0 1 1 7 18.5' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' fill='none'></path><path d='M10 12.25 11.75 14 15 10.75' stroke='currentColor' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round' fill='none'></path></svg>";
     case 'offline':
       return "<svg viewBox='0 0 24 24' focusable='false'><path d='M4.5 9.5a11 11 0 0 1 15 0M7.5 12.5a6.8 6.8 0 0 1 6.25-1.3M10.5 15.5a3 3 0 0 1 1.5-.4M4 4l16 16' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' fill='none'></path><circle cx='12' cy='19' r='1.2' fill='currentColor'></circle></svg>";
     case 'danger':
@@ -1319,7 +1328,12 @@ function buildRoomGlyph(kind) {
 }
 
 function buildPlayerStateBadge(label, modifier) {
-  const glyphKey = modifier === 'danger' ? 'danger' : modifier;
+  let glyphKey = modifier;
+  if (modifier === 'danger') {
+    glyphKey = 'danger';
+  } else if (modifier === 'waitingrestore') {
+    glyphKey = 'restore';
+  }
   return `<span class='playerStateBadge playerStateBadge-${modifier}' title='${escapeHtml(
     label
   )}' aria-label='${escapeHtml(label)}'><span class='playerStateBadgeIcon' aria-hidden='true'>${buildRoomGlyph(
@@ -1532,6 +1546,17 @@ function strOfAvatar(playerData, alliance) {
     }
     if (isOnCurrentTeam) {
       stateBadges.push(buildPlayerStateBadge('Team', 'team'));
+    }
+    if (playerData.isBot === true) {
+      stateBadges.push(buildPlayerStateBadge('Bot', 'bot'));
+    }
+    if (playerData.botControlled === true) {
+      stateBadges.push(buildPlayerStateBadge('Bot controlled', 'bot'));
+    }
+    if (playerData.awaitingHumanRestore === true) {
+      stateBadges.push(
+        buildPlayerStateBadge('Waiting for human restore', 'waitingrestore')
+      );
     }
     if (playerData.disconnected === true) {
       stateBadges.push(buildPlayerStateBadge('Away', 'offline'));

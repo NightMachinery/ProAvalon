@@ -68,6 +68,14 @@ The previous absolute-position hacks for the room bars are removed from the main
 - **Two tabs** desktop room option
 - **Use original avatars** option for legacy mode
 - existing gameplay, chat, claim, vote, and restart flows
+- host-only **Bots** modal for:
+  - adding standalone SimpleBots before game start
+  - assigning SimpleBot to an absent player seat
+  - restoring a reconnected player from bot control
+- room player badges for:
+  - standalone bot seats
+  - bot-controlled seats
+  - seats waiting for human restore
 
 ## Deferred work
 

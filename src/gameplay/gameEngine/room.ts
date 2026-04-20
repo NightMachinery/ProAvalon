@@ -91,6 +91,9 @@ class Room {
   allSockets: SocketUser[];
   socketsOfPlayers: SocketUser[];
   botSockets: Socket[];
+  botControlledUsernames: Record<string, boolean>;
+  pendingHumanRestores: string[];
+  botUsed: boolean;
 
   claimingPlayers: Set<string> = new Set();
 
@@ -120,6 +123,9 @@ class Room {
     this.allSockets = [];
     this.socketsOfPlayers = [];
     this.botSockets = [];
+    this.botControlledUsernames = {};
+    this.pendingHumanRestores = [];
+    this.botUsed = false;
 
     // Arrays containing lower cased usernames
     this.kickedPlayers = [];
@@ -152,12 +158,137 @@ class Room {
     return {
       request: socket.request,
       isBotSocket: socket.isBotSocket === true,
+      botSeatMode: socket.botSeatMode,
+      botProfileName: socket.botProfileName,
+      controlledHumanUsername: socket.controlledHumanUsername,
       reservedSeat: true,
       disconnected: true,
       handleGameStart: socket.handleGameStart,
       handleGameOver: socket.handleGameOver,
       handleRequestAction: socket.handleRequestAction,
     };
+  }
+
+  isBotControlledUsername(username: string): boolean {
+    if (!username) {
+      return false;
+    }
+
+    return this.botControlledUsernames[username.toLowerCase()] === true;
+  }
+
+  markBotControlledUsername(username: string, botControlled: boolean): void {
+    if (!username) {
+      return;
+    }
+
+    const usernameLower = username.toLowerCase();
+    if (botControlled) {
+      this.botControlledUsernames[usernameLower] = true;
+    } else {
+      delete this.botControlledUsernames[usernameLower];
+    }
+  }
+
+  hasConnectedHumanSocket(username: string): boolean {
+    if (!username) {
+      return false;
+    }
+
+    return this.allSockets.some(
+      (socket) =>
+        socket &&
+        socket.isBotSocket !== true &&
+        socket.request &&
+        socket.request.user &&
+        socket.request.user.username &&
+        socket.request.user.username.toLowerCase() === username.toLowerCase(),
+    );
+  }
+
+  findConnectedHumanSocket(username: string) {
+    if (!username) {
+      return undefined;
+    }
+
+    return this.allSockets.find(
+      (socket) =>
+        socket &&
+        socket.isBotSocket !== true &&
+        socket.request &&
+        socket.request.user &&
+        socket.request.user.username &&
+        socket.request.user.username.toLowerCase() === username.toLowerCase(),
+    );
+  }
+
+  addPendingHumanRestore(username: string): void {
+    if (!username) {
+      return;
+    }
+
+    const usernameLower = username.toLowerCase();
+    if (
+      this.pendingHumanRestores.find(
+        (name) => name.toLowerCase() === usernameLower,
+      ) === undefined
+    ) {
+      this.pendingHumanRestores.push(username);
+    }
+  }
+
+  removePendingHumanRestore(username: string): void {
+    if (!username) {
+      return;
+    }
+
+    const usernameLower = username.toLowerCase();
+    this.pendingHumanRestores = this.pendingHumanRestores.filter(
+      (name) => name.toLowerCase() !== usernameLower,
+    );
+  }
+
+  isAwaitingHumanRestore(username: string): boolean {
+    if (!username) {
+      return false;
+    }
+
+    return (
+      this.pendingHumanRestores.find(
+        (name) => name.toLowerCase() === username.toLowerCase(),
+      ) !== undefined
+    );
+  }
+
+  flagBotUsage(triggeringUsername?: string): void {
+    this.botUsed = true;
+
+    if (this.ranked) {
+      this.ranked = false;
+      this.sendText(
+        `${
+          triggeringUsername || 'A host'
+        } enabled bot support, so this room is now unranked.`,
+        'server-text',
+      );
+    }
+  }
+
+  getBotSeatModeByUsername(username: string): string | undefined {
+    const currentSocket = this.socketsOfPlayers.find(
+      (socket) =>
+        socket &&
+        socket.request &&
+        socket.request.user &&
+        socket.request.user.username &&
+        socket.request.user.username.toLowerCase() === username.toLowerCase(),
+    );
+
+    if (currentSocket) {
+      return currentSocket.botSeatMode;
+    }
+
+    return undefined;
   }
 
   getConnectedPlayerCount(): number {
@@ -181,6 +312,7 @@ class Room {
       maxNumPlayers: this.maxNumPlayers,
       gameMode: this.gameMode,
       ranked: this.ranked ? 'ranked' : 'unranked',
+      botUsed: this.botUsed === true,
       muteSpectators: Boolean(this.muteSpectators),
       disableVoteHistory: Boolean(this.disableVoteHistory),
       listedInLobby: this.listedInLobby !== false,
@@ -238,6 +370,19 @@ class Room {
     }
 
     this.allSockets.push(socket);
+
+    if (
+      socket.isBotSocket !== true &&
+      this.isBotControlledUsername(socket.request.user.username)
+    ) {
+      this.addPendingHumanRestore(socket.request.user.username);
+      this.updateRoomPlayers();
+      socket.emit(
+        'danger-alert',
+        'Your seat is currently bot-controlled. The host must restore you to regain control.',
+      );
+      return true;
+    }
 
     const reservedSeatIndex = this.findSeatIndexByUsername(
       socket.request.user.username,
@@ -359,6 +504,10 @@ class Room {
       this.allSockets.splice(index, 1);
     }
 
+    if (socket.isBotSocket !== true) {
+      this.removePendingHumanRestore(socket.request.user.username);
+    }
+
     if (
       this.allSockets.length === 0 &&
       this.socketsOfPlayers.length === 0 &&
@@ -379,6 +528,10 @@ class Room {
     const index = this.allSockets.indexOf(socket);
     if (index !== -1) {
       this.allSockets.splice(index, 1);
+    }
+
+    if (socket.isBotSocket !== true) {
+      this.removePendingHumanRestore(socket.request.user.username);
     }
 
     let newHostSocket;
@@ -539,6 +692,15 @@ class Room {
         avatarHide: this.socketsOfPlayers[i].request.user.avatarHide,
         claim: isClaiming,
         disconnected: this.socketsOfPlayers[i].reservedSeat === true,
+        isBot:
+          this.socketsOfPlayers[i].isBotSocket === true &&
+          this.socketsOfPlayers[i].botSeatMode === 'standalone',
+        botControlled: this.isBotControlledUsername(
+          this.socketsOfPlayers[i].request.user.username,
+        ),
+        awaitingHumanRestore: this.isAwaitingHumanRestore(
+          this.socketsOfPlayers[i].request.user.username,
+        ),
       };
 
       // give the host the teamLeader star
@@ -601,6 +763,15 @@ class Room {
     }
 
     if (this.gameMode === GameMode.AVALON_BOT) {
+      return;
+    }
+
+    if (this.botUsed && rankedType === 'ranked') {
+      this.sendText(
+        'This room has used bots and cannot be ranked until it is restarted.',
+        'server-text',
+      );
+      this.updateRoomPlayers();
       return;
     }
 

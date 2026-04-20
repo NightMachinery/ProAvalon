@@ -618,8 +618,9 @@ const processRecords = async function (records) {
     // Filter out the bot games
     records = records.filter(
       (r) =>
-        r.gameMode === undefined ||
-        r.gameMode.toLowerCase().includes('bot') == false,
+        (r.gameMode === undefined ||
+          r.gameMode.toLowerCase().includes('bot') == false) &&
+        r.botUsed !== true,
     );
 
     // Keep track of number of bot games

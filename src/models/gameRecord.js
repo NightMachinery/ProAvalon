@@ -15,6 +15,8 @@ const gameRecordSchema = new mongoose.Schema({
   anonymousMode: Boolean,
 
   botUsernames: [String],
+  botControlledSeats: [String],
+  botUsed: Boolean,
 
   playerUsernamesOrdered: [String],
   playerUsernamesOrderedReversed: [String],

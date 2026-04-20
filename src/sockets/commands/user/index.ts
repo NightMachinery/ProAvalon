@@ -15,6 +15,10 @@ import { unmute } from './unmute';
 import { mods } from './mods';
 import { pmmod } from './pmmod';
 import { r } from './r';
+import { addbot } from './addbot';
+import { rembot } from './rembot';
+import { takebot } from './takebot';
+import { restorehuman } from './restorehuman';
 
 export const userCommandsImported: Commands = {
   [help.command]: help,
@@ -33,4 +37,8 @@ export const userCommandsImported: Commands = {
   [mute.command]: mute,
   [unmute.command]: unmute,
   [muted.command]: muted,
+  [addbot.command]: addbot,
+  [rembot.command]: rembot,
+  [takebot.command]: takebot,
+  [restorehuman.command]: restorehuman,
 };

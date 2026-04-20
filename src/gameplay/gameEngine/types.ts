@@ -89,4 +89,7 @@ export type RoomPlayer = {
   avatarHide: boolean;
   claim: boolean;
   disconnected?: boolean;
+  isBot?: boolean;
+  botControlled?: boolean;
+  awaitingHumanRestore?: boolean;
 };

@@ -7,6 +7,11 @@ interface SocketUserAdditions {
 }
 
 export type SocketUser = Socket & {
+  isBotSocket?: boolean;
+  botSeatMode?: string;
+  botProfileName?: string;
+  controlledHumanUsername?: string;
+  reservedSeat?: boolean;
   request: {
     user: typeof User & UserDocument & SocketUserAdditions & IUser;
   };

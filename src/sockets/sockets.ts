@@ -692,6 +692,10 @@ export const server = function (io: SocketServer): void {
     socket.on('restart-room', restartRoom);
     socket.on('gameMove', gameMove);
     socket.on('setClaim', setClaim);
+    socket.on('bot-add', botAdd);
+    socket.on('bot-remove', botRemove);
+    socket.on('bot-takeover', botTakeover);
+    socket.on('bot-restore', botRestore);
 
     // Assign the socket their rating bracket
     socket = assignRatingBracket(socket);
@@ -2168,6 +2172,60 @@ function setClaim(data) {
   if (rooms[this.request.user.inRoomId]) {
     rooms[this.request.user.inRoomId].setClaim(this, data);
   }
+}
+
+function runHostBotAction(
+  socket: SocketUser,
+  action: (room: Game) => { success: boolean; message: string },
+) {
+  const room = rooms[socket.request.user.inRoomId];
+  if (!room) {
+    sendReplyToCommand(socket, 'You are not in a room.');
+    return;
+  }
+
+  if (room.host !== socket.request.user.username) {
+    sendReplyToCommand(socket, 'Only the host can manage bots in this room.');
+    return;
+  }
+
+  const result = action(room);
+  if (!result || !result.message) {
+    return;
+  }
+
+  if (result.success) {
+    room.sendText(result.message, 'server-text-teal');
+  } else {
+    sendReplyToCommand(socket, result.message);
+  }
+
+  room.distributeGameData();
+  updateCurrentGamesList();
+}
+
+function botAdd(numBots: string | number) {
+  runHostBotAction(this, (room) =>
+    room.addStandaloneBots(parseInt(numBots as string, 10), this.request.user.username),
+  );
+}
+
+function botRemove(botName: string) {
+  runHostBotAction(this, (room) =>
+    room.removeStandaloneBots(botName || 'all', this.request.user.username),
+  );
+}
+
+function botTakeover(targetUsername: string) {
+  runHostBotAction(this, (room) =>
+    room.takeOverSeatWithBot(targetUsername, this.request.user.username),
+  );
+}
+
+function botRestore(targetUsername: string) {
+  runHostBotAction(this, (room) =>
+    room.restoreHumanSeat(targetUsername, this.request.user.username),
+  );
 }
 
 function gameMove(data) {

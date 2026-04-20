@@ -76,6 +76,71 @@ async function greenButtonFunction() {
   $('#mainRoomBox div').removeClass('highlight-avatar');
 }
 
+function renderBotControlModal() {
+  const seatList = document.querySelector('#botControlSeatList');
+  if (!seatList) {
+    return;
+  }
+
+  if (!roomPlayersData || isCurrentUserHost() !== true) {
+    seatList.innerHTML = '<p class="text-muted">Only the current host can manage bots.</p>';
+    return;
+  }
+
+  const rankedNote =
+    roomInfoData && roomInfoData.botUsed === true
+      ? '<p class="text-warning">This room has used bots and is locked to unranked until restart.</p>'
+      : '';
+
+  const seatRows = roomPlayersData
+    .map((player) => {
+      const actions = [];
+      const status = [];
+
+      if (player.isBot === true) {
+        status.push('Standalone bot');
+        if (gameStarted === false) {
+          actions.push(
+            `<button type="button" class="btn btn-xs btn-danger" data-bot-action="remove-standalone" data-username="${player.username}">Remove</button>`
+          );
+        }
+      } else if (player.botControlled === true) {
+        status.push('Bot controlled');
+        if (player.awaitingHumanRestore === true) {
+          status.push('Human rejoined');
+          actions.push(
+            `<button type="button" class="btn btn-xs btn-primary" data-bot-action="restore-human" data-username="${player.username}">Restore human</button>`
+          );
+        }
+      } else if (player.disconnected === true) {
+        status.push('Absent');
+        actions.push(
+          `<button type="button" class="btn btn-xs btn-primary" data-bot-action="takeover-seat" data-username="${player.username}">Assign bot</button>`
+        );
+      } else {
+        status.push('Connected');
+      }
+
+      return `
+        <div class="well well-sm" style="margin-bottom: 0.75rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap: 0.75rem; flex-wrap: wrap;">
+            <div>
+              <strong>${player.username}</strong>
+              <div class="text-muted">${status.join(' • ') || 'No bot actions available'}</div>
+            </div>
+            <div style="display:flex; gap:0.5rem; flex-wrap: wrap;">
+              ${actions.join('')}
+            </div>
+          </div>
+        </div>`;
+    })
+    .join('');
+
+  seatList.innerHTML =
+    rankedNote +
+    (seatRows || '<p class="text-muted">No seats currently support bot actions.</p>');
+}
+
 //= =====================================
 // BUTTON EVENT LISTENERS
 //= =====================================
@@ -85,6 +150,37 @@ document
 document
   .querySelector('#red-button')
   .addEventListener('click', redButtonFunction);
+
+$('#botControlModal').on('show.bs.modal', () => {
+  renderBotControlModal();
+});
+
+document.querySelector('#botAddButton').addEventListener('click', () => {
+  const count = parseInt(document.querySelector('#botAddCount').value, 10);
+  socket.emit('bot-add', count);
+});
+
+document.querySelector('#botRemoveAllButton').addEventListener('click', () => {
+  socket.emit('bot-remove', 'all');
+});
+
+document.querySelector('#botControlSeatList').addEventListener('click', (event) => {
+  const actionButton = event.target.closest('[data-bot-action]');
+  if (!actionButton) {
+    return;
+  }
+
+  const username = actionButton.getAttribute('data-username');
+  const action = actionButton.getAttribute('data-bot-action');
+
+  if (action === 'remove-standalone') {
+    socket.emit('bot-remove', username);
+  } else if (action === 'takeover-seat') {
+    socket.emit('bot-takeover', username);
+  } else if (action === 'restore-human') {
+    socket.emit('bot-restore', username);
+  }
+});
 
 // re-draw the game screen when the modal is closed to update the roles in the center well.
 $('#roleOptionsModal').on('hidden.bs.modal', (e) => {

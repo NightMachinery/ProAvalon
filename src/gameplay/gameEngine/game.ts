@@ -33,6 +33,7 @@ import shuffleArray from '../../util/shuffleArray';
 import { Anonymizer } from './anonymizer';
 import { sendReplyToCommand } from '../../sockets/sockets';
 import { gamesPlayedMetric } from '../../metrics/gameMetrics';
+import { SimpleBotSocket } from '../../sockets/bot';
 
 export const WAITING = 'Waiting';
 export const MIN_PLAYERS = 5;
@@ -195,6 +196,337 @@ class Game extends Room {
     this.recoverableComponents.push(this.anonymizer);
   }
 
+  refreshBotIndexes(): void {
+    this.botIndexes = [];
+
+    for (let i = 0; i < this.socketsOfPlayers.length; i++) {
+      if (this.socketsOfPlayers[i] && this.socketsOfPlayers[i].isBotSocket) {
+        this.botIndexes.push(i);
+      }
+    }
+  }
+
+  syncBotAutomation(): void {
+    this.refreshBotIndexes();
+
+    if (this.botIndexes.length === 0) {
+      if (this.interval) {
+        clearInterval(this.interval);
+        this.interval = undefined;
+      }
+      return;
+    }
+
+    if (!this.interval && this.gameStarted) {
+      this.checkBotMoves([]);
+    }
+  }
+
+  getSeatSocketByUsername(username: string) {
+    return this.socketsOfPlayers.find(
+      (socket) =>
+        socket &&
+        socket.request &&
+        socket.request.user &&
+        socket.request.user.username &&
+        socket.request.user.username.toLowerCase() === username.toLowerCase(),
+    );
+  }
+
+  getPlayerRequestUserByUsername(username: string) {
+    const seatSocket = this.getSeatSocketByUsername(username);
+    if (seatSocket && seatSocket.request && seatSocket.request.user) {
+      return seatSocket.request.user;
+    }
+
+    const player = this.playersInGame.find(
+      (candidate) =>
+        candidate &&
+        candidate.username &&
+        candidate.username.toLowerCase() === username.toLowerCase(),
+    );
+    if (player && player.request && player.request.user) {
+      return player.request.user;
+    }
+
+    return undefined;
+  }
+
+  getStandaloneBotSockets() {
+    return (this.botSockets || []).filter(
+      (socket) => socket && socket.botSeatMode === 'standalone',
+    );
+  }
+
+  generateUniqueStandaloneBotName(): string {
+    const currentUsernames = []
+      .concat(
+        this.playersInGame.map((player) => player.username),
+        this.socketsOfPlayers.map((socket) => socket.request.user.username),
+      )
+      .filter(Boolean)
+      .map((username) => username.toLowerCase());
+
+    let botName = '';
+    do {
+      botName = `${'SimpleBot' + '#'}${Math.floor(Math.random() * 10000)}`;
+    } while (currentUsernames.includes(botName.toLowerCase()));
+
+    return botName;
+  }
+
+  addStandaloneBots(numBots: number, requestedByUsername: string) {
+    if (this.gameStarted === true) {
+      return {
+        success: false,
+        message: 'Standalone bots can only be added before the game starts.',
+      };
+    }
+
+    if (!numBots || isNaN(numBots) || numBots < 1) {
+      return {
+        success: false,
+        message: 'Please specify a positive number of bots to add.',
+      };
+    }
+
+    if (this.socketsOfPlayers.length + numBots > this.maxNumPlayers) {
+      return {
+        success: false,
+        message: `Adding ${numBots} bot(s) would make this room too full.`,
+      };
+    }
+
+    const addedBots = [];
+    for (let i = 0; i < numBots; i++) {
+      const botName = this.generateUniqueStandaloneBotName();
+      const botSocket = new SimpleBotSocket(botName, {
+        botSeatMode: 'standalone',
+        botProfileName: 'SimpleBot',
+      });
+
+      this.playerJoinRoom(botSocket, '');
+      this.playerSitDown(botSocket);
+      this.botSockets.push(botSocket);
+      addedBots.push(botName);
+    }
+
+    this.flagBotUsage(requestedByUsername);
+    this.updateRoomPlayers();
+
+    return {
+      success: true,
+      message: `${requestedByUsername} added bots to this room: ${addedBots.join(
+        ', ',
+      )}`,
+    };
+  }
+
+  removeStandaloneBots(botName: string, requestedByUsername: string) {
+    if (this.gameStarted === true) {
+      return {
+        success: false,
+        message: 'Standalone bots can only be removed before the game starts.',
+      };
+    }
+
+    if (botName && botName !== 'all') {
+      botName = this.anonymizer.deAnon(botName);
+    }
+
+    const standaloneBots = this.getStandaloneBotSockets();
+    const botsToRemove =
+      botName === 'all'
+        ? standaloneBots
+        : standaloneBots.filter(
+            (socket) =>
+              socket.request.user.username.toLowerCase() ===
+              botName.toLowerCase(),
+          );
+
+    if (botsToRemove.length === 0) {
+      return {
+        success: false,
+        message: "Couldn't find any standalone bots with that name to remove.",
+      };
+    }
+
+    botsToRemove.forEach((botSocket) => {
+      this.playerLeaveRoom(botSocket);
+      this.botSockets = this.botSockets.filter((socket) => socket !== botSocket);
+    });
+
+    this.updateRoomPlayers();
+
+    return {
+      success: true,
+      message: `${requestedByUsername} removed bots from this room: ${botsToRemove
+        .map((socket) => socket.request.user.username)
+        .join(', ')}`,
+    };
+  }
+
+  takeOverSeatWithBot(targetUsername: string, requestedByUsername: string) {
+    if (!targetUsername) {
+      return {
+        success: false,
+        message: 'Please specify a player to hand over to a bot.',
+      };
+    }
+
+    targetUsername = this.anonymizer.deAnon(targetUsername);
+
+    const normalizedTargetUsername = targetUsername.toLowerCase();
+    const playerInGame = this.playersInGame.find(
+      (player) =>
+        player &&
+        player.username &&
+        player.username.toLowerCase() === normalizedTargetUsername,
+    );
+    const seatSocket = this.getSeatSocketByUsername(targetUsername);
+
+    const targetRequestUser =
+      this.getPlayerRequestUserByUsername(targetUsername) ||
+      (seatSocket && seatSocket.request ? seatSocket.request.user : undefined);
+
+    if (!targetRequestUser) {
+      return {
+        success: false,
+        message: `Could not find player ${targetUsername} in this room.`,
+      };
+    }
+
+    if (this.isBotControlledUsername(targetRequestUser.username)) {
+      return {
+        success: false,
+        message: `${targetRequestUser.username} is already bot-controlled.`,
+      };
+    }
+
+    if (seatSocket && seatSocket.isBotSocket === true) {
+      return {
+        success: false,
+        message: `${targetRequestUser.username} is already a standalone bot seat.`,
+      };
+    }
+
+    if (this.hasConnectedHumanSocket(targetRequestUser.username)) {
+      return {
+        success: false,
+        message: `${targetRequestUser.username} is still connected. Bot takeover is only available for absent players.`,
+      };
+    }
+
+    if (this.gameStarted === true && !playerInGame) {
+      return {
+        success: false,
+        message: `${targetRequestUser.username} is not seated in this running game.`,
+      };
+    }
+
+    if (this.gameStarted !== true && !seatSocket) {
+      return {
+        success: false,
+        message: `${targetRequestUser.username} is not seated in this room.`,
+      };
+    }
+
+    const botSocket = new SimpleBotSocket(targetRequestUser.username, {
+      requestUser: { ...targetRequestUser },
+      botSeatMode: 'takeover',
+      botProfileName: 'SimpleBot',
+      controlledHumanUsername: targetRequestUser.username,
+    });
+
+    this.playerJoinRoom(botSocket, '');
+    if (this.gameStarted !== true) {
+      this.playerSitDown(botSocket);
+    }
+    this.botSockets.push(botSocket);
+    this.markBotControlledUsername(targetRequestUser.username, true);
+    this.removePendingHumanRestore(targetRequestUser.username);
+    this.flagBotUsage(requestedByUsername);
+
+    if (this.gameStarted === true) {
+      this.distributeGameData();
+      this.syncBotAutomation();
+    } else {
+      this.updateRoomPlayers();
+    }
+
+    return {
+      success: true,
+      message: `${requestedByUsername} assigned SimpleBot to ${targetRequestUser.username}'s seat.`,
+    };
+  }
+
+  restoreHumanSeat(targetUsername: string, requestedByUsername: string) {
+    if (!targetUsername) {
+      return {
+        success: false,
+        message: 'Please specify a player to restore.',
+      };
+    }
+
+    targetUsername = this.anonymizer.deAnon(targetUsername);
+
+    const seatSocket = this.getSeatSocketByUsername(targetUsername);
+    if (
+      !seatSocket ||
+      seatSocket.isBotSocket !== true ||
+      seatSocket.botSeatMode !== 'takeover'
+    ) {
+      return {
+        success: false,
+        message: `${targetUsername} is not currently bot-controlled.`,
+      };
+    }
+
+    const humanSocket = this.findConnectedHumanSocket(targetUsername);
+    if (!humanSocket) {
+      return {
+        success: false,
+        message: `${targetUsername} must be back in the room before you can restore them.`,
+      };
+    }
+
+    const seatIndex = this.findSeatIndexByUsername(targetUsername);
+    if (seatIndex === -1) {
+      return {
+        success: false,
+        message: `Could not find ${targetUsername}'s seat to restore.`,
+      };
+    }
+
+    this.socketsOfPlayers[seatIndex] = humanSocket;
+    this.botSockets = this.botSockets.filter((socket) => socket !== seatSocket);
+    this.allSockets = this.allSockets.filter((socket) => socket !== seatSocket);
+    this.markBotControlledUsername(targetUsername, false);
+    this.removePendingHumanRestore(targetUsername);
+
+    const playerInGame = this.playersInGame.find(
+      (player) =>
+        player &&
+        player.username &&
+        player.username.toLowerCase() === targetUsername.toLowerCase(),
+    );
+    if (playerInGame) {
+      playerInGame.request = humanSocket.request;
+    }
+
+    if (this.gameStarted === true) {
+      this.distributeGameData();
+      this.syncBotAutomation();
+    } else {
+      this.updateRoomPlayers();
+    }
+
+    return {
+      success: true,
+      message: `${requestedByUsername} restored ${targetUsername} to human control.`,
+    };
+  }
+
   // RECOVER GAME!
   recoverGame(storedData): void {
     // Set a few variables back to new state
@@ -258,6 +590,36 @@ class Game extends Room {
     }
 
     this.setupRecoverableComponents();
+
+    this.botSockets = (storedData.botSockets || []).map(
+      (storedBotSocket) =>
+        new SimpleBotSocket(storedBotSocket.request.user.username, {
+          requestUser: storedBotSocket.request.user,
+          botSeatMode: storedBotSocket.botSeatMode,
+          botProfileName: storedBotSocket.botProfileName,
+          controlledHumanUsername: storedBotSocket.controlledHumanUsername,
+        }),
+    );
+
+    if (this.gameStarted === true) {
+      this.socketsOfPlayers = this.playersInGame.map((player) => {
+        const botSocket = this.botSockets.find(
+          (socket) =>
+            socket.request.user.username.toLowerCase() ===
+            player.username.toLowerCase(),
+        );
+        if (botSocket) {
+          return botSocket;
+        }
+
+        return this.createReservedSeat({
+          request: player.request,
+          isBotSocket: false,
+        });
+      });
+    }
+
+    this.refreshBotIndexes();
   }
 
   serialise(): string {
@@ -271,6 +633,13 @@ class Game extends Room {
   }
 
   playerJoinRoom(socket, inputPassword) {
+    if (
+      socket.isBotSocket !== true &&
+      this.isBotControlledUsername(socket.request.user.username)
+    ) {
+      return Room.prototype.playerJoinRoom.call(this, socket, inputPassword);
+    }
+
     if (this.gameStarted === true) {
       let rejoinSeatIndex = -1;
       let previousSeat;
@@ -389,6 +758,10 @@ class Game extends Room {
 
     if (this.gameStarted === true) {
       this.host = origHost;
+    }
+
+    if (socket.isBotSocket === true) {
+      this.syncBotAutomation();
     }
   }
 
@@ -652,12 +1025,7 @@ class Game extends Room {
 
     this.distributeGameData();
 
-    this.botIndexes = [];
-    for (let i = 0; i < this.socketsOfPlayers.length; i++) {
-      if (this.socketsOfPlayers[i].isBotSocket === true) {
-        this.botIndexes.push(i);
-      }
-    }
+    this.refreshBotIndexes();
 
     const thisGame = this;
     const pendingBots = [];
@@ -679,13 +1047,19 @@ class Game extends Room {
         });
       });
 
-    this.checkBotMoves(pendingBots);
+    if (this.botIndexes.length > 0) {
+      this.checkBotMoves(pendingBots);
+    }
 
     return true;
   }
 
   checkBotMoves(pendingBots) {
     if (this.botIndexes.length === 0) {
+      return;
+    }
+
+    if (this.interval) {
       return;
     }
 
@@ -1022,6 +1396,9 @@ class Game extends Room {
   getRoomPlayers(): RoomPlayer[] {
     if (this.gameStarted === true) {
       const roomPlayers = [];
+      const playersInRoom = getUsernamesOfPlayersInRoom(this).map((username) =>
+        username.toLowerCase(),
+      );
 
       for (let i = 0; i < this.playersInGame.length; i++) {
         const isClaiming = this.claimingPlayers.has(
@@ -1045,6 +1422,21 @@ class Game extends Room {
             ? null
             : this.playersInGame[i].request.user.avatarHide,
           claim: isClaiming,
+          disconnected:
+            playersInRoom.includes(this.playersInGame[i].username.toLowerCase()) ===
+              false &&
+            this.isBotControlledUsername(this.playersInGame[i].username) ===
+              false,
+          isBot:
+            this.playersInGame[i].request.user.bot === true &&
+            this.isBotControlledUsername(this.playersInGame[i].username) ===
+              false,
+          botControlled: this.isBotControlledUsername(
+            this.playersInGame[i].username,
+          ),
+          awaitingHumanRestore: this.isAwaitingHumanRestore(
+            this.playersInGame[i].username,
+          ),
         };
 
         // give the host the teamLeader star
@@ -1428,10 +1820,12 @@ class Game extends Room {
 
     // console.log(this.gameMode);
     let botUsernames;
+    let botControlledSeats = [];
     if (this.botSockets !== undefined) {
-      botUsernames = this.botSockets.map(
-        (botSocket) => botSocket.request.user.username,
-      );
+      botUsernames = this.botSockets
+        .filter((botSocket) => botSocket.botSeatMode === 'standalone')
+        .map((botSocket) => botSocket.request.user.username);
+      botControlledSeats = Object.keys(this.botControlledUsernames || {});
     } else {
       botUsernames = [];
     }
@@ -1462,6 +1856,8 @@ class Game extends Room {
       roomCreationType: this.roomCreationType,
       anonymousMode: this.anonymousMode,
       botUsernames,
+      botControlledSeats,
+      botUsed: this.botUsed === true,
 
       playerUsernamesOrdered: getUsernamesOfPlayersInGame(this),
       playerUsernamesOrderedReversed: gameReverseArray(
@@ -1542,7 +1938,7 @@ class Game extends Room {
         });
       });
 
-    if (botUsernames.length === 0) {
+    if (this.botUsed !== true) {
       // Check if the game contains any provisional players.
       let provisionalGame = false;
       if (

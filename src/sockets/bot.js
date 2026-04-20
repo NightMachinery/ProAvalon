@@ -8,6 +8,26 @@ enabledBots.push({
   authorizationKey: undefined,
 });
 
+function createBotUser(username, baseUser = {}) {
+  return {
+    id: baseUser.id,
+    username,
+    usernameLower: username.toLowerCase(),
+    bot: true,
+    avatarImgRes: baseUser.avatarImgRes || null,
+    avatarImgSpy: baseUser.avatarImgSpy || null,
+    avatarHide: baseUser.avatarHide || false,
+    totalGamesPlayed: baseUser.totalGamesPlayed || 0,
+    totalRankedGamesPlayed: baseUser.totalRankedGamesPlayed || 0,
+    playerRating: baseUser.playerRating || 1500,
+    ratingBracket: baseUser.ratingBracket || 'unranked',
+    ...baseUser,
+    username,
+    usernameLower: username.toLowerCase(),
+    bot: true,
+  };
+}
+
 // if (process.env.BOT_DEEPROLE_API_KEY) {
 //     enabledBots.push({
 //         name: 'DeepRole',
@@ -22,13 +42,15 @@ enabledBots.push({
 // }
 
 export class SimpleBotSocket {
-  constructor(username) {
+  constructor(username, options = {}) {
+    const requestUser = createBotUser(username, options.requestUser || {});
+
     this.isBotSocket = true;
+    this.botSeatMode = options.botSeatMode || 'standalone';
+    this.botProfileName = options.botProfileName || 'SimpleBot';
+    this.controlledHumanUsername = options.controlledHumanUsername;
     this.request = {
-      user: {
-        username,
-        bot: true,
-      },
+      user: requestUser,
     };
   }
 
@@ -130,11 +152,10 @@ function checkBotCapabilities(game, capabilities) {
 export class APIBotSocket {
   constructor(username, botAPI) {
     this.isBotSocket = true;
+    this.botSeatMode = 'standalone';
+    this.botProfileName = botAPI.name;
     this.request = {
-      user: {
-        username,
-        bot: true,
-      },
+      user: createBotUser(username),
     };
     this.botAPI = botAPI;
   }
