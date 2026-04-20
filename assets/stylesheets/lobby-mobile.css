@@ -636,3 +636,89 @@
     max-width: min(100%, var(--room-player-card-preferred-width));
   }
 }
+
+/* === final mobile top-bar alignment overrides === */
+@media (max-width: 767px) {
+  .room-layout-mobile .roomInfoBar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: 'primary mission badges';
+    align-items: center;
+    justify-items: stretch;
+    column-gap: var(--space-sm);
+    row-gap: var(--space-xs);
+  }
+
+  .room-layout-mobile .roomInfoPrimary {
+    grid-area: primary;
+    justify-self: start;
+  }
+
+  .room-layout-mobile .roomInfoMissionTrack {
+    order: initial;
+    grid-area: mission;
+    width: auto;
+    min-width: 0;
+    justify-content: center;
+    align-self: center;
+  }
+
+  .room-layout-mobile .roomInfoMissionTrack #missionsBox {
+    width: max-content;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+
+  .room-layout-mobile #missionsBox .missionTrackRow,
+  .room-layout-mobile #missionsBox .pickTrackRow {
+    justify-content: center;
+  }
+
+  .room-layout-mobile #missionsBox .missionBox {
+    width: 1.95rem;
+    height: 1.95rem;
+  }
+
+  .room-layout-mobile #missionsBox .missionBox p {
+    font-size: 0.68rem;
+  }
+
+  .room-layout-mobile #missionsBox .pickBox {
+    width: 0.5rem;
+    height: 0.5rem;
+  }
+
+  .room-layout-mobile .roomInfoBadges {
+    grid-area: badges;
+    justify-content: end;
+    justify-self: end;
+    margin-left: 0;
+    width: max-content;
+    min-width: max-content;
+  }
+}
+
+@media (max-width: 389px) {
+  .room-layout-mobile .roomInfoBar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'primary . badges'
+      'mission mission mission';
+    align-items: start;
+  }
+
+  .room-layout-mobile .roomInfoMissionTrack {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .room-layout-mobile .roomInfoMissionTrack #missionsBox {
+    margin: 0 auto;
+  }
+
+  .room-layout-mobile .roomInfoBadges {
+    justify-content: end;
+    justify-self: end;
+    margin-left: 0;
+  }
+}

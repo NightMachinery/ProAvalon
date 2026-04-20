@@ -100,3 +100,4 @@ The modern in-room card layout now follows a simpler sizing model:
 - the mission / failed-election track now lives in the top room info bar
 - modern state, vote, and investigation markers use compact inline SVG symbols instead of text-heavy pills
 - private investigation results from Lady / Ref / Sire now persist as a compact eye-marker on the relevant card for the current room session
+- on mobile, the top room bar now keeps Claim left, mission info centered, and timer/player badges right; only the mission cluster drops to a second line on very narrow widths
