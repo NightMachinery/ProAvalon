@@ -23,6 +23,9 @@ class Assassination implements IPhase {
     buttonPressed: string,
     selectedPlayers: string[],
   ): void {
+    const seatUsername =
+      this.room.getSeatUsernameForSocket(socket) || socket.request.user.username;
+
     if (buttonPressed !== 'yes') {
       // this.thisRoom.sendText(this.thisRoom.allSockets, `Button pressed was ${buttonPressed}. Let admin know if you see this.`, "gameplay-text");
       return;
@@ -34,7 +37,7 @@ class Assassination implements IPhase {
         // Check that the person making this request is the assassin
         const indexOfRequester = usernamesIndexes.getIndexFromUsername(
           this.room.playersInGame,
-          socket.request.user.username,
+          seatUsername,
         );
         if (this.room.playersInGame[indexOfRequester].role === this.role) {
           // Just shoot Merlin

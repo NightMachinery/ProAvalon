@@ -620,7 +620,8 @@ const processRecords = async function (records) {
       (r) =>
         (r.gameMode === undefined ||
           r.gameMode.toLowerCase().includes('bot') == false) &&
-        r.botUsed !== true,
+        r.botUsed !== true &&
+        r.seatSwitchUsed !== true,
     );
 
     // Keep track of number of bot games

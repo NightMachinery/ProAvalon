@@ -19,9 +19,10 @@ class VotingMission implements IPhase {
     buttonPressed: string,
     selectedPlayers: string[],
   ): void {
-    const i = this.thisRoom.playersYetToVote.indexOf(
-      socket.request.user.username,
-    );
+    const seatUsername =
+      this.thisRoom.getSeatUsernameForSocket(socket) ||
+      socket.request.user.username;
+    const i = this.thisRoom.playersYetToVote.indexOf(seatUsername);
 
     // if this.thisRoom vote is coming from someone who hasn't voted yet
     if (i !== -1) {
@@ -29,7 +30,7 @@ class VotingMission implements IPhase {
         this.thisRoom.missionVotes[
           usernamesIndexes.getIndexFromUsername(
             this.thisRoom.playersInGame,
-            socket.request.user.username,
+            seatUsername,
           )
         ] = 'succeed';
         // console.log("received succeed from " + socket.request.user.username);
@@ -37,7 +38,7 @@ class VotingMission implements IPhase {
         // Determine the player index
         const index = usernamesIndexes.getIndexFromUsername(
           this.thisRoom.playersInGame,
-          socket.request.user.username,
+          seatUsername,
         );
 
         // If player is Resistance and NOT Moregano, block failing
@@ -63,7 +64,7 @@ class VotingMission implements IPhase {
         this.thisRoom.missionVotes[
           usernamesIndexes.getIndexFromUsername(
             this.thisRoom.playersInGame,
-            socket.request.user.username,
+            seatUsername,
           )
         ] = effectiveVote;
 
@@ -77,7 +78,7 @@ class VotingMission implements IPhase {
       this.thisRoom.playersYetToVote.splice(i, 1);
     } else {
       console.log(
-        `Player ${socket.request.user.username} has already voted or is not in the game`,
+        `Player ${seatUsername} has already voted or is not in the game`,
       );
     }
 

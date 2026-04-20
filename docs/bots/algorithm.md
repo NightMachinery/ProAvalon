@@ -56,25 +56,36 @@ There are two public bot modes:
    - occupy their own seat
    - appear as bot seats in the room UI
 
-2. **Bot-controlled human seats**
-   - used when a seated player becomes absent
+2. **Bot-controlled running-game seats**
+   - used when the host switches a live seat to SimpleBot
    - preserve the original seat identity, role, and game slot
    - swap only the active controller from human to bot
 
-If the original player reconnects:
+During a running game, the host can switch a seat controller between:
 
-- they rejoin the room as a spectator
-- the seat stays bot-controlled
-- the host must explicitly restore the seat back to the human
+- **SimpleBot**
+- the **original player**
+- any **currently connected spectator**
+
+If the original player is not the current controller and reconnects:
+
+- they join or remain in the room as a spectator
+- the seat stays under its current controller
+- the host must explicitly switch the seat back to the original player
+
+If a substitute spectator disconnects, the seat becomes controller-less until
+the host switches it again.
 
 ## Ranked behavior
 
-Bot usage is allowed so games can continue, but the room is downgraded for
-competitive integrity:
+Bot usage and live seat substitutions are allowed so games can continue, but
+the room is downgraded for competitive integrity:
 
-- the first bot add/takeover flips the room to **unranked**
+- the first bot add or live seat switch away from the original player flips the
+  room to **unranked**
 - the room stays unranked until it is restarted
-- bot-involved games are excluded from rating/stat updates and bot-free stats
+- bot/substitution-involved games are excluded from rating/stat updates and
+  bot-free stats
 
 ## Why the algorithm is simple
 

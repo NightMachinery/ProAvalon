@@ -14,6 +14,10 @@ class Sire {
   }
 
   gameMove(socket, buttonPressed, selectedPlayers) {
+    const seatUsername =
+      this.thisRoom.getSeatUsernameForSocket(socket) ||
+      socket.request.user.username;
+
     if (buttonPressed !== 'yes') {
       // this.thisRoom.sendText(this.thisRoom.allSockets, `Button pressed was ${buttonPressed}. Let admin know if you see this.`, "gameplay-text");
       return;
@@ -64,9 +68,7 @@ class Sire {
     // Get index of socket
     let indexOfSocket;
     for (var i = 0; i < this.thisRoom.playersInGame.length; i++) {
-      if (
-        this.thisRoom.playersInGame[i].username === socket.request.user.username
-      ) {
+      if (this.thisRoom.playersInGame[i].username === seatUsername) {
         indexOfSocket = i;
         break;
       }
@@ -87,8 +89,7 @@ class Sire {
       let alliance;
       for (var i = 0; i < this.thisRoom.playersInGame.length; i++) {
         if (
-          this.thisRoom.playersInGame[i].username ===
-          socket.request.user.username
+          this.thisRoom.playersInGame[i].username === seatUsername
         ) {
           alliance = this.thisRoom.playersInGame[i].alliance;
         }
@@ -118,12 +119,12 @@ class Sire {
         'lady-info',
         {
           subjectUsername: this.thisRoom.anonymizer.anon(
-            socket.request.user.username,
+            seatUsername,
           ),
           alliance,
           sourceCard: this.card,
           message: `${this.thisRoom.anonymizer.anon(
-            socket.request.user.username,
+            seatUsername,
           )} is a ${alliance}.`,
         },
       );
@@ -135,7 +136,7 @@ class Sire {
       // this.gameplayMessage = (socket.request.user.username + " has carded " + target);
       this.thisRoom.sendText(
         `${this.thisRoom.anonymizer.anon(
-          socket.request.user.username,
+          seatUsername,
         )} has used ${this.card} on ${this.thisRoom.anonymizer.anon(
           targetUsername,
         )}.`,

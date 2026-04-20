@@ -3,7 +3,7 @@ import { rooms, sendReplyToCommand, updateCurrentGamesList } from '../../sockets
 
 export const restorehuman: Command = {
   command: 'restorehuman',
-  help: '/restorehuman <player>: Host-only. Restore a reconnected player from bot control.',
+  help: '/restorehuman <player>: Host-only alias for /switchseat <player> original.',
   run: async (args, socket) => {
     const room = rooms[socket.request.user.inRoomId];
     if (!room) {
@@ -16,7 +16,10 @@ export const restorehuman: Command = {
       return;
     }
 
-    const result = room.restoreHumanSeat(args[1], socket.request.user.username);
+    const result = room.switchSeatController(args[1], {
+      controllerType: 'original',
+      requestedByUsername: socket.request.user.username,
+    });
     if (result.success) {
       room.sendText(result.message, 'server-text-teal');
       room.distributeGameData();

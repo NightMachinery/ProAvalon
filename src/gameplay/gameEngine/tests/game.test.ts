@@ -470,6 +470,58 @@ describe('Game Engine', () => {
       expect(game.getSeatSocketByUsername(targetUsername)).toBe(targetSocket);
     });
 
+    it('allows the host to switch a seat between original player, bot, and a connected spectator', () => {
+      startGame(6, []);
+
+      game.ranked = true;
+
+      const spectatorSocket = testSockets[6];
+      spectatorSocket.request.user.username = 'spectator';
+      game.playerJoinRoom(spectatorSocket, password);
+
+      const teamLeaderSeat = game.playersInGame[game.teamLeader].username;
+      const originalSeatSocket = game.getSeatSocketByUsername(teamLeaderSeat);
+      const missionSize = NUM_PLAYERS_ON_MISSION[1][game.missionNum - 1];
+      const pickedPlayers = game.playersInGame
+        .slice(0, missionSize)
+        .map((player) => anon(player.username));
+
+      const spectatorSwitchResult = game.switchSeatController(teamLeaderSeat, {
+        controllerType: 'spectator',
+        controllerUsername: 'spectator',
+        requestedByUsername: '1',
+      });
+
+      expect(spectatorSwitchResult.success).toEqual(true);
+      expect(game.ranked).toEqual(false);
+      expect(game.seatSwitchUsed).toEqual(true);
+      expect(game.getSeatSocketByUsername(teamLeaderSeat)).toBe(spectatorSocket);
+
+      game.gameMove(spectatorSocket, ['yes', pickedPlayers]);
+      expect(game.phase).toEqual(Phase.VotingTeam);
+
+      const botSwitchResult = game.switchSeatController(teamLeaderSeat, {
+        controllerType: 'bot',
+        requestedByUsername: '1',
+      });
+
+      expect(botSwitchResult.success).toEqual(true);
+      expect(game.botUsed).toEqual(true);
+      expect(game.getSeatSocketByUsername(teamLeaderSeat).isBotSocket).toEqual(
+        true,
+      );
+
+      const originalSwitchResult = game.switchSeatController(teamLeaderSeat, {
+        controllerType: 'original',
+        requestedByUsername: '1',
+      });
+
+      expect(originalSwitchResult.success).toEqual(true);
+      expect(game.getSeatSocketByUsername(teamLeaderSeat)).toBe(
+        originalSeatSocket,
+      );
+    });
+
     it('stores bot metadata on finished games', () => {
       startGame(6, []);
 
@@ -488,6 +540,38 @@ describe('Game Engine', () => {
         expect.objectContaining({
           botUsed: true,
           botControlledSeats: [targetUsername.toLowerCase()],
+        }),
+        expect.any(Function),
+      );
+    });
+
+    it('stores seat-switch metadata on finished games', () => {
+      startGame(6, []);
+
+      const spectatorSocket = testSockets[6];
+      spectatorSocket.request.user.username = 'spectator';
+      game.playerJoinRoom(spectatorSocket, password);
+
+      const targetUsername = game.playersInGame[0].username;
+      game.switchSeatController(targetUsername, {
+        controllerType: 'spectator',
+        controllerUsername: 'spectator',
+        requestedByUsername: '1',
+      });
+      game.winner = Alliance.Resistance;
+      (game as any).howWasWon = 'Test outcome';
+      game.finishGame(Alliance.Resistance);
+
+      expect(GameRecord.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          seatSwitchUsed: true,
+          seatControlHistory: expect.arrayContaining([
+            expect.objectContaining({
+              seatUsername: targetUsername.toLowerCase(),
+              controllerType: 'spectator',
+              controllerUsername: 'spectator',
+            }),
+          ]),
         }),
         expect.any(Function),
       );

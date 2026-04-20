@@ -18,6 +18,10 @@ class PickingTeam implements IPhase {
     buttonPressed: string,
     selectedPlayers: string[],
   ): void {
+    const seatUsername =
+      this.thisRoom.getSeatUsernameForSocket(socket) ||
+      socket.request.user.username;
+
     if (buttonPressed !== 'yes') {
       // this.thisRoom.sendText(this.thisRoom.allSockets, `Button pressed was ${buttonPressed}. Let admin know if you see this.`, "gameplay-text");
       return;
@@ -44,7 +48,7 @@ class PickingTeam implements IPhase {
     if (
       usernamesIndexes.getIndexFromUsername(
         this.thisRoom.playersInGame,
-        socket.request.user.username,
+        seatUsername,
       ) === this.thisRoom.teamLeader
     ) {
       // Reset votes
@@ -87,7 +91,7 @@ class PickingTeam implements IPhase {
       }
 
       let str2 = `${this.thisRoom.anonymizer.anon(
-        socket.request.user.username,
+        seatUsername,
       )} has picked: ${str}`;
 
       // remove the last , and replace with .
@@ -101,7 +105,7 @@ class PickingTeam implements IPhase {
       this.thisRoom.changePhase(Phase.VotingTeam);
     } else {
       console.log(
-        `User ${socket.request.user.username} is not the team leader. Cannot pick.`,
+        `User ${seatUsername} is not the team leader. Cannot pick.`,
       );
     }
   }

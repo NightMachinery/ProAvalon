@@ -18,10 +18,12 @@ class VotingTeam implements IPhase {
     buttonPressed: string,
     selectedPlayers: string[],
   ): void {
+    const seatUsername =
+      this.thisRoom.getSeatUsernameForSocket(socket) ||
+      socket.request.user.username;
+
     // Get the index of the user who is trying to vote
-    const i = this.thisRoom.playersYetToVote.indexOf(
-      socket.request.user.username,
-    );
+    const i = this.thisRoom.playersYetToVote.indexOf(seatUsername);
 
     // Check the data is valid (if it is not a "yes" or a "no")
     if (!(buttonPressed === 'yes' || buttonPressed === 'no')) {
@@ -34,14 +36,14 @@ class VotingTeam implements IPhase {
         this.thisRoom.votes[
           usernamesIndexes.getIndexFromUsername(
             this.thisRoom.playersInGame,
-            socket.request.user.username,
+            seatUsername,
           )
         ] = 'approve';
       } else if (buttonPressed === 'no') {
         this.thisRoom.votes[
           usernamesIndexes.getIndexFromUsername(
             this.thisRoom.playersInGame,
-            socket.request.user.username,
+            seatUsername,
           )
         ] = 'reject';
       } else {

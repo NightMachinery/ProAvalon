@@ -17,6 +17,8 @@ const gameRecordSchema = new mongoose.Schema({
   botUsernames: [String],
   botControlledSeats: [String],
   botUsed: Boolean,
+  seatSwitchUsed: Boolean,
+  seatControlHistory: [Object],
 
   playerUsernamesOrdered: [String],
   playerUsernamesOrderedReversed: [String],

@@ -720,8 +720,10 @@ socket.on('update-room-info', (data) => {
   $($('.gameModeSelect')[1]).val(data.gameMode);
   $($('.rankedSelect')[0]).val(data.ranked);
   $($('.rankedSelect')[1]).val(data.ranked);
-  $('.rankedSelect')[0].disabled = data.botUsed === true;
-  $('.rankedSelect')[1].disabled = data.botUsed === true;
+  $('.rankedSelect')[0].disabled =
+    data.botUsed === true || data.seatSwitchUsed === true;
+  $('.rankedSelect')[1].disabled =
+    data.botUsed === true || data.seatSwitchUsed === true;
   $('.muteSpectators')[0].checked = data.muteSpectators;
   $('.muteSpectators')[1].checked = data.muteSpectators;
   $('.disableVoteHistory')[0].checked = data.disableVoteHistory;

@@ -88,9 +88,102 @@ function renderBotControlModal() {
   }
 
   const rankedNote =
-    roomInfoData && roomInfoData.botUsed === true
-      ? '<p class="text-warning">This room has used bots and is locked to unranked until restart.</p>'
+    roomInfoData &&
+    (roomInfoData.botUsed === true || roomInfoData.seatSwitchUsed === true)
+      ? '<p class="text-warning">This room has used seat switching and is locked to unranked until restart.</p>'
       : '';
+
+  const connectedSpectators =
+    roomInfoData && Array.isArray(roomInfoData.connectedSpectators)
+      ? roomInfoData.connectedSpectators
+      : [];
+
+  const renderSeatSwitchMenu = (player) => {
+    const optionItems = [];
+    const seenSpectators = new Set();
+
+    const pushOption = (label, controllerType, controllerUsername, enabled, current) => {
+      optionItems.push(`
+        <li class="${enabled ? '' : 'disabled'}">
+          <a href="#" data-seat-controller-option="true" data-seat-username="${escapeHtml(
+            player.username
+          )}" data-controller-type="${controllerType}"${
+            controllerUsername
+              ? ` data-controller-username="${escapeHtml(controllerUsername)}"`
+              : ''
+          }>
+            ${current ? "<span class='glyphicon glyphicon-ok'></span> " : ''}
+            ${escapeHtml(label)}
+          </a>
+        </li>`);
+    };
+
+    pushOption(
+      'SimpleBot',
+      'bot',
+      '',
+      player.controllerType !== 'bot',
+      player.controllerType === 'bot'
+    );
+
+    pushOption(
+      'Original player',
+      'original',
+      '',
+      player.originalPlayerConnected === true || player.controllerType === 'original',
+      player.controllerType === 'original'
+    );
+
+    if (
+      player.controllerType === 'spectator' &&
+      player.controllerUsername &&
+      seenSpectators.has(player.controllerUsername) === false
+    ) {
+      seenSpectators.add(player.controllerUsername);
+      pushOption(
+        player.controllerUsername,
+        'spectator',
+        player.controllerUsername,
+        false,
+        true
+      );
+    }
+
+    connectedSpectators.forEach((spectatorUsername) => {
+      if (!spectatorUsername || seenSpectators.has(spectatorUsername) === true) {
+        return;
+      }
+
+      seenSpectators.add(spectatorUsername);
+      pushOption(
+        spectatorUsername,
+        'spectator',
+        spectatorUsername,
+        player.controllerType !== 'spectator' ||
+          player.controllerUsername !== spectatorUsername,
+        player.controllerType === 'spectator' &&
+          player.controllerUsername === spectatorUsername
+      );
+    });
+
+    return `
+      <div class="btn-group">
+        <button
+          type="button"
+          class="btn btn-xs btn-default dropdown-toggle"
+          data-toggle="dropdown"
+          aria-haspopup="true"
+          aria-expanded="false"
+          title="Switch seat controller"
+        >
+          <span class="glyphicon glyphicon-transfer"></span>
+          <span class="caret"></span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-right">
+          ${optionItems.join('')}
+        </ul>
+      </div>`;
+  };
 
   const seatRows = roomPlayersData
     .map((player) => {
@@ -104,13 +197,27 @@ function renderBotControlModal() {
             `<button type="button" class="btn btn-xs btn-danger" data-bot-action="remove-standalone" data-username="${player.username}">Remove</button>`
           );
         }
-      } else if (player.botControlled === true) {
-        status.push('Bot controlled');
+      } else if (gameStarted === true) {
+        if (player.controllerType === 'bot') {
+          status.push(`Controlled by ${player.controllerUsername || 'SimpleBot'}`);
+        } else if (player.controllerType === 'spectator') {
+          status.push(`Controlled by ${player.controllerUsername}`);
+        } else if (player.disconnected === true) {
+          status.push('Absent');
+        } else {
+          status.push('Controlled by original player');
+        }
+
         if (player.awaitingHumanRestore === true) {
-          status.push('Human rejoined');
-          actions.push(
-            `<button type="button" class="btn btn-xs btn-primary" data-bot-action="restore-human" data-username="${player.username}">Restore human</button>`
-          );
+          status.push('Original player connected');
+        }
+
+        if (player.disconnected === true) {
+          status.push('Controller away');
+        }
+
+        if (player.isBot !== true) {
+          actions.push(renderSeatSwitchMenu(player));
         }
       } else if (player.disconnected === true) {
         status.push('Absent');
@@ -166,19 +273,33 @@ document.querySelector('#botRemoveAllButton').addEventListener('click', () => {
 
 document.querySelector('#botControlSeatList').addEventListener('click', (event) => {
   const actionButton = event.target.closest('[data-bot-action]');
-  if (!actionButton) {
+  const controllerOption = event.target.closest('[data-seat-controller-option]');
+
+  if (actionButton) {
+    const username = actionButton.getAttribute('data-username');
+    const action = actionButton.getAttribute('data-bot-action');
+
+    if (action === 'remove-standalone') {
+      socket.emit('bot-remove', username);
+    } else if (action === 'takeover-seat') {
+      socket.emit('bot-takeover', username);
+    }
     return;
   }
 
-  const username = actionButton.getAttribute('data-username');
-  const action = actionButton.getAttribute('data-bot-action');
+  if (controllerOption) {
+    if (controllerOption.parentElement.classList.contains('disabled')) {
+      event.preventDefault();
+      return;
+    }
 
-  if (action === 'remove-standalone') {
-    socket.emit('bot-remove', username);
-  } else if (action === 'takeover-seat') {
-    socket.emit('bot-takeover', username);
-  } else if (action === 'restore-human') {
-    socket.emit('bot-restore', username);
+    event.preventDefault();
+    socket.emit('seat-controller-set', {
+      seatUsername: controllerOption.getAttribute('data-seat-username'),
+      controllerType: controllerOption.getAttribute('data-controller-type'),
+      controllerUsername:
+        controllerOption.getAttribute('data-controller-username') || undefined,
+    });
   }
 });
 

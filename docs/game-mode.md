@@ -16,15 +16,16 @@ That means:
 
 - the game still runs normal Avalon rules
 - hosts can add **SimpleBot** seats before a game starts
-- hosts can hand an absent player seat over to **SimpleBot** during a game
-- reconnecting players can be restored back to human control by the host
+- during a running game, hosts can switch a seat between **SimpleBot**, the
+  **original player**, and any **connected spectator**
+- reconnecting players stay available for the host to switch back in
 
 ## Ranked behavior
 
-Bot support is available so rooms do not die when someone leaves, but the room
-is no longer treated as competitive once a bot is used.
+Bot support and live seat substitution keep rooms playable, but the room is no
+longer treated as competitive once the host overrides a seat.
 
-On the first bot add or seat takeover:
+On the first bot add or live seat switch away from the original player:
 
 - the room is downgraded to **unranked**
 - it stays unranked until the room is restarted
@@ -38,6 +39,7 @@ Hosts can manage bots through:
 - slash commands:
   - `/addbot`
   - `/rembot`
+  - `/switchseat`
   - `/takebot`
   - `/restorehuman`
 

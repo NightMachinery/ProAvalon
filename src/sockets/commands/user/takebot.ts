@@ -3,7 +3,7 @@ import { rooms, sendReplyToCommand, updateCurrentGamesList } from '../../sockets
 
 export const takebot: Command = {
   command: 'takebot',
-  help: '/takebot <player>: Host-only. Hand an absent player seat over to SimpleBot.',
+  help: '/takebot <player>: Host-only alias for /switchseat <player> bot.',
   run: async (args, socket) => {
     const room = rooms[socket.request.user.inRoomId];
     if (!room) {
@@ -16,7 +16,10 @@ export const takebot: Command = {
       return;
     }
 
-    const result = room.takeOverSeatWithBot(args[1], socket.request.user.username);
+    const result = room.switchSeatController(args[1], {
+      controllerType: 'bot',
+      requestedByUsername: socket.request.user.username,
+    });
     if (result.success) {
       room.sendText(result.message, 'server-text-teal');
       room.distributeGameData();

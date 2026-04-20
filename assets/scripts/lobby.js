@@ -1310,6 +1310,8 @@ function buildRoomGlyph(kind) {
       return "<svg viewBox='0 0 24 24' focusable='false'><rect x='6.25' y='7.25' width='11.5' height='9.5' rx='2' stroke='currentColor' stroke-width='1.7' fill='none'></rect><circle cx='10' cy='12' r='1' fill='currentColor'></circle><circle cx='14' cy='12' r='1' fill='currentColor'></circle><path d='M12 4.25v2.5M9 16.75v2M15 16.75v2M4.75 10.5h1.5M17.75 10.5h1.5' stroke='currentColor' stroke-width='1.7' stroke-linecap='round'></path></svg>";
     case 'restore':
       return "<svg viewBox='0 0 24 24' focusable='false'><path d='M7 7.5H4.5V5M4.5 7.5A7.5 7.5 0 1 1 7 18.5' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' fill='none'></path><path d='M10 12.25 11.75 14 15 10.75' stroke='currentColor' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round' fill='none'></path></svg>";
+    case 'controller':
+      return "<svg viewBox='0 0 24 24' focusable='false'><path d='M7 8.5h10M13.75 5.25 17 8.5l-3.25 3.25M17 15.5H7M10.25 12.25 7 15.5l3.25 3.25' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' fill='none'></path></svg>";
     case 'offline':
       return "<svg viewBox='0 0 24 24' focusable='false'><path d='M4.5 9.5a11 11 0 0 1 15 0M7.5 12.5a6.8 6.8 0 0 1 6.25-1.3M10.5 15.5a3 3 0 0 1 1.5-.4M4 4l16 16' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' fill='none'></path><circle cx='12' cy='19' r='1.2' fill='currentColor'></circle></svg>";
     case 'danger':
@@ -1333,6 +1335,8 @@ function buildPlayerStateBadge(label, modifier) {
     glyphKey = 'danger';
   } else if (modifier === 'waitingrestore') {
     glyphKey = 'restore';
+  } else if (modifier === 'controller') {
+    glyphKey = 'controller';
   }
   return `<span class='playerStateBadge playerStateBadge-${modifier}' title='${escapeHtml(
     label
@@ -1551,7 +1555,20 @@ function strOfAvatar(playerData, alliance) {
       stateBadges.push(buildPlayerStateBadge('Bot', 'bot'));
     }
     if (playerData.botControlled === true) {
-      stateBadges.push(buildPlayerStateBadge('Bot controlled', 'bot'));
+      stateBadges.push(
+        buildPlayerStateBadge(
+          `Controlled by ${playerData.controllerUsername || 'SimpleBot'}`,
+          'bot'
+        )
+      );
+    }
+    if (playerData.controllerType === 'spectator') {
+      stateBadges.push(
+        buildPlayerStateBadge(
+          `Controlled by ${playerData.controllerUsername}`,
+          'controller'
+        )
+      );
     }
     if (playerData.awaitingHumanRestore === true) {
       stateBadges.push(

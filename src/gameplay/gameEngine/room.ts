@@ -92,8 +92,14 @@ class Room {
   socketsOfPlayers: SocketUser[];
   botSockets: Socket[];
   botControlledUsernames: Record<string, boolean>;
+  seatControllerStates: Record<
+    string,
+    { controllerType: string; controllerUsername?: string }
+  >;
   pendingHumanRestores: string[];
   botUsed: boolean;
+  seatSwitchUsed: boolean;
+  seatControlHistory: any[];
 
   claimingPlayers: Set<string> = new Set();
 
@@ -124,8 +130,11 @@ class Room {
     this.socketsOfPlayers = [];
     this.botSockets = [];
     this.botControlledUsernames = {};
+    this.seatControllerStates = {};
     this.pendingHumanRestores = [];
     this.botUsed = false;
+    this.seatSwitchUsed = false;
+    this.seatControlHistory = [];
 
     // Arrays containing lower cased usernames
     this.kickedPlayers = [];
@@ -140,18 +149,24 @@ class Room {
   findSeatIndexByUsername(username: string): number {
     for (let i = 0; i < this.socketsOfPlayers.length; i++) {
       const roomSocket = this.socketsOfPlayers[i];
+      const effectiveSeatUsername = this.getEffectiveSeatUsername(roomSocket);
       if (
-        roomSocket &&
-        roomSocket.request &&
-        roomSocket.request.user &&
-        roomSocket.request.user.username &&
-        roomSocket.request.user.username.toLowerCase() === username.toLowerCase()
+        effectiveSeatUsername &&
+        effectiveSeatUsername.toLowerCase() === username.toLowerCase()
       ) {
         return i;
       }
     }
 
     return -1;
+  }
+
+  getEffectiveSeatUsername(socket: SocketUser): string | undefined {
+    if (!socket) {
+      return undefined;
+    }
+
+    return socket.controlledSeatUsername || socket.request?.user?.username;
   }
 
   createReservedSeat(socket: SocketUser) {
@@ -161,6 +176,7 @@ class Room {
       botSeatMode: socket.botSeatMode,
       botProfileName: socket.botProfileName,
       controlledHumanUsername: socket.controlledHumanUsername,
+      controlledSeatUsername: socket.controlledSeatUsername,
       reservedSeat: true,
       disconnected: true,
       handleGameStart: socket.handleGameStart,
@@ -188,6 +204,42 @@ class Room {
     } else {
       delete this.botControlledUsernames[usernameLower];
     }
+  }
+
+  getSeatControllerState(username: string) {
+    if (!username) {
+      return undefined;
+    }
+
+    return this.seatControllerStates[username.toLowerCase()];
+  }
+
+  setSeatControllerState(
+    username: string,
+    controllerType: string,
+    controllerUsername?: string,
+  ): void {
+    if (!username) {
+      return;
+    }
+
+    this.seatControllerStates[username.toLowerCase()] = {
+      controllerType,
+      controllerUsername,
+    };
+  }
+
+  clearSeatControllerState(username: string): void {
+    if (!username) {
+      return;
+    }
+
+    delete this.seatControllerStates[username.toLowerCase()];
+  }
+
+  isSeatSubstitutedUsername(username: string): boolean {
+    const state = this.getSeatControllerState(username);
+    return state !== undefined && state.controllerType !== 'original';
   }
 
   hasConnectedHumanSocket(username: string): boolean {
@@ -274,6 +326,20 @@ class Room {
     }
   }
 
+  flagSeatSwitchUsage(triggeringUsername?: string): void {
+    this.seatSwitchUsed = true;
+
+    if (this.ranked) {
+      this.ranked = false;
+      this.sendText(
+        `${
+          triggeringUsername || 'A host'
+        } switched a seat away from its original player, so this room is now unranked.`,
+        'server-text',
+      );
+    }
+  }
+
   getBotSeatModeByUsername(username: string): string | undefined {
     const currentSocket = this.socketsOfPlayers.find(
       (socket) =>
@@ -313,6 +379,7 @@ class Room {
       gameMode: this.gameMode,
       ranked: this.ranked ? 'ranked' : 'unranked',
       botUsed: this.botUsed === true,
+      seatSwitchUsed: this.seatSwitchUsed === true,
       muteSpectators: Boolean(this.muteSpectators),
       disableVoteHistory: Boolean(this.disableVoteHistory),
       listedInLobby: this.listedInLobby !== false,
@@ -373,13 +440,13 @@ class Room {
 
     if (
       socket.isBotSocket !== true &&
-      this.isBotControlledUsername(socket.request.user.username)
+      this.isSeatSubstitutedUsername(socket.request.user.username)
     ) {
       this.addPendingHumanRestore(socket.request.user.username);
       this.updateRoomPlayers();
       socket.emit(
         'danger-alert',
-        'Your seat is currently bot-controlled. The host must restore you to regain control.',
+        'Your seat is currently controlled by someone else. The host must switch you back to regain control.',
       );
       return true;
     }
@@ -671,6 +738,7 @@ class Room {
         tmpSocket.emit('update-room-spectators', usernamesOfSpecs);
         tmpSocket.emit('update-room-info', {
           ...this.getRoomInfo(),
+          connectedSpectators: usernamesOfSpecs,
           isHost: tmpSocket.request.user.username === this.host,
         });
       }
@@ -696,11 +764,19 @@ class Room {
           this.socketsOfPlayers[i].isBotSocket === true &&
           this.socketsOfPlayers[i].botSeatMode === 'standalone',
         botControlled: this.isBotControlledUsername(
-          this.socketsOfPlayers[i].request.user.username,
+          this.getEffectiveSeatUsername(this.socketsOfPlayers[i]),
         ),
         awaitingHumanRestore: this.isAwaitingHumanRestore(
-          this.socketsOfPlayers[i].request.user.username,
+          this.getEffectiveSeatUsername(this.socketsOfPlayers[i]),
         ),
+        controllerType:
+          this.socketsOfPlayers[i].isBotSocket === true ? 'bot' : 'original',
+        controllerUsername:
+          this.socketsOfPlayers[i].isBotSocket === true
+            ? this.socketsOfPlayers[i].botProfileName ||
+              this.socketsOfPlayers[i].request.user.username
+            : undefined,
+        originalPlayerConnected: true,
       };
 
       // give the host the teamLeader star
@@ -766,9 +842,9 @@ class Room {
       return;
     }
 
-    if (this.botUsed && rankedType === 'ranked') {
+    if ((this.botUsed || this.seatSwitchUsed) && rankedType === 'ranked') {
       this.sendText(
-        'This room has used bots and cannot be ranked until it is restarted.',
+        'This room has used seat substitutions and cannot be ranked until it is restarted.',
         'server-text',
       );
       this.updateRoomPlayers();

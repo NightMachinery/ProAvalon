@@ -624,9 +624,14 @@ export const userCommandsOLD = {
       ) {
         messageToClient = 'You must be at a running table to guess Merlin.';
       } else {
+        const room = rooms[senderSocket.request.user.inRoomId];
         messageToClient = rooms[
           senderSocket.request.user.inRoomId
-        ].submitMerlinGuess(senderSocket.request.user.username, args[1]);
+        ].submitMerlinGuess(
+          room.getSeatUsernameForSocket(senderSocket) ||
+            senderSocket.request.user.username,
+          args[1],
+        );
       }
 
       return { message: messageToClient, classStr: 'server-text noselect' };
@@ -696,6 +701,7 @@ export const server = function (io: SocketServer): void {
     socket.on('bot-remove', botRemove);
     socket.on('bot-takeover', botTakeover);
     socket.on('bot-restore', botRestore);
+    socket.on('seat-controller-set', seatControllerSet);
 
     // Assign the socket their rating bracket
     socket = assignRatingBracket(socket);
@@ -2185,7 +2191,10 @@ function runHostBotAction(
   }
 
   if (room.host !== socket.request.user.username) {
-    sendReplyToCommand(socket, 'Only the host can manage bots in this room.');
+    sendReplyToCommand(
+      socket,
+      'Only the host can manage seat controllers in this room.',
+    );
     return;
   }
 
@@ -2218,13 +2227,33 @@ function botRemove(botName: string) {
 
 function botTakeover(targetUsername: string) {
   runHostBotAction(this, (room) =>
-    room.takeOverSeatWithBot(targetUsername, this.request.user.username),
+    room.switchSeatController(targetUsername, {
+      controllerType: 'bot',
+      requestedByUsername: this.request.user.username,
+    }),
   );
 }
 
 function botRestore(targetUsername: string) {
   runHostBotAction(this, (room) =>
-    room.restoreHumanSeat(targetUsername, this.request.user.username),
+    room.switchSeatController(targetUsername, {
+      controllerType: 'original',
+      requestedByUsername: this.request.user.username,
+    }),
+  );
+}
+
+function seatControllerSet(data: {
+  seatUsername: string;
+  controllerType: 'bot' | 'original' | 'spectator';
+  controllerUsername?: string;
+}) {
+  runHostBotAction(this, (room) =>
+    room.switchSeatController(data?.seatUsername, {
+      controllerType: data?.controllerType,
+      controllerUsername: data?.controllerUsername,
+      requestedByUsername: this.request.user.username,
+    }),
   );
 }
 

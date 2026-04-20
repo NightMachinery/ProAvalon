@@ -11,6 +11,7 @@ export type SocketUser = Socket & {
   botSeatMode?: string;
   botProfileName?: string;
   controlledHumanUsername?: string;
+  controlledSeatUsername?: string;
   reservedSeat?: boolean;
   request: {
     user: typeof User & UserDocument & SocketUserAdditions & IUser;

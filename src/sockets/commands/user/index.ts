@@ -19,6 +19,7 @@ import { addbot } from './addbot';
 import { rembot } from './rembot';
 import { takebot } from './takebot';
 import { restorehuman } from './restorehuman';
+import { switchseat } from './switchseat';
 
 export const userCommandsImported: Commands = {
   [help.command]: help,
@@ -41,4 +42,5 @@ export const userCommandsImported: Commands = {
   [rembot.command]: rembot,
   [takebot.command]: takebot,
   [restorehuman.command]: restorehuman,
+  [switchseat.command]: switchseat,
 };

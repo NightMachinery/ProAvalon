@@ -225,20 +225,13 @@ class Game extends Room {
   getSeatSocketByUsername(username: string) {
     return this.socketsOfPlayers.find(
       (socket) =>
-        socket &&
-        socket.request &&
-        socket.request.user &&
-        socket.request.user.username &&
-        socket.request.user.username.toLowerCase() === username.toLowerCase(),
+        this.getEffectiveSeatUsername(socket) &&
+        this.getEffectiveSeatUsername(socket).toLowerCase() ===
+          username.toLowerCase(),
     );
   }
 
   getPlayerRequestUserByUsername(username: string) {
-    const seatSocket = this.getSeatSocketByUsername(username);
-    if (seatSocket && seatSocket.request && seatSocket.request.user) {
-      return seatSocket.request.user;
-    }
-
     const player = this.playersInGame.find(
       (candidate) =>
         candidate &&
@@ -249,7 +242,184 @@ class Game extends Room {
       return player.request.user;
     }
 
+    const seatSocket = this.getSeatSocketByUsername(username);
+    if (seatSocket && seatSocket.request && seatSocket.request.user) {
+      return seatSocket.request.user;
+    }
+
     return undefined;
+  }
+
+  getSeatIndexForSocket(socket: SocketUser): number {
+    const effectiveSeatUsername = this.getEffectiveSeatUsername(socket);
+    if (!effectiveSeatUsername) {
+      return -1;
+    }
+
+    return this.playersInGame.findIndex(
+      (player) =>
+        player &&
+        player.username &&
+        player.username.toLowerCase() === effectiveSeatUsername.toLowerCase(),
+    );
+  }
+
+  getSeatUsernameForSocket(socket: SocketUser): string | undefined {
+    const seatIndex = this.getSeatIndexForSocket(socket);
+    if (seatIndex === -1 || !this.playersInGame[seatIndex]) {
+      return undefined;
+    }
+
+    return this.playersInGame[seatIndex].username;
+  }
+
+  getControllerSocketByUsername(username: string) {
+    if (!username) {
+      return undefined;
+    }
+
+    return this.allSockets.find(
+      (socket) =>
+        socket &&
+        socket.isBotSocket !== true &&
+        socket.request &&
+        socket.request.user &&
+        socket.request.user.username &&
+        socket.request.user.username.toLowerCase() === username.toLowerCase(),
+    );
+  }
+
+  getSeatControllerSummary(username: string) {
+    const seatSocket = this.getSeatSocketByUsername(username);
+    const storedState = this.getSeatControllerState(username);
+    const originalPlayerConnected = this.hasConnectedHumanSocket(username);
+
+    if (seatSocket && seatSocket.isBotSocket === true) {
+      return {
+        controllerType: 'bot',
+        controllerUsername:
+          seatSocket.botProfileName || seatSocket.request.user.username,
+        connected: true,
+        standalone: seatSocket.botSeatMode === 'standalone',
+        originalPlayerConnected,
+      };
+    }
+
+    if (seatSocket && typeof seatSocket.emit === 'function') {
+      const effectiveSeatUsername = this.getEffectiveSeatUsername(seatSocket);
+      if (
+        effectiveSeatUsername &&
+        effectiveSeatUsername.toLowerCase() === username.toLowerCase() &&
+        seatSocket.request.user.username.toLowerCase() !== username.toLowerCase()
+      ) {
+        return {
+          controllerType: 'spectator',
+          controllerUsername: seatSocket.request.user.username,
+          connected: true,
+          standalone: false,
+          originalPlayerConnected,
+        };
+      }
+
+      return {
+        controllerType: 'original',
+        controllerUsername: undefined,
+        connected: true,
+        standalone: false,
+        originalPlayerConnected,
+      };
+    }
+
+    return {
+      controllerType: storedState?.controllerType || 'original',
+      controllerUsername: storedState?.controllerUsername,
+      connected: false,
+      standalone: false,
+      originalPlayerConnected,
+    };
+  }
+
+  refreshPendingHumanRestoreForSeat(username: string): void {
+    const summary = this.getSeatControllerSummary(username);
+    if (
+      summary.controllerType !== 'original' &&
+      this.hasConnectedHumanSocket(username)
+    ) {
+      this.addPendingHumanRestore(username);
+    } else {
+      this.removePendingHumanRestore(username);
+    }
+  }
+
+  recordSeatControllerChange(
+    seatUsername: string,
+    controllerType: string,
+    requestedByUsername: string,
+    controllerUsername?: string,
+  ): void {
+    this.seatControlHistory.push({
+      seatUsername: seatUsername.toLowerCase(),
+      controllerType,
+      controllerUsername,
+      requestedByUsername,
+      dateCreated: new Date(),
+    });
+  }
+
+  attachControllerToSeat(
+    seatIndex: number,
+    seatUsername: string,
+    controllerSocket: SocketUser,
+    controllerType: string,
+  ): void {
+    const existingSeatSocket = this.getSeatSocketByUsername(seatUsername);
+    const existingSeatArrayIndex =
+      existingSeatSocket !== undefined
+        ? this.socketsOfPlayers.indexOf(existingSeatSocket)
+        : -1;
+
+    if (
+      existingSeatSocket &&
+      existingSeatSocket !== controllerSocket &&
+      existingSeatSocket.isBotSocket !== true
+    ) {
+      existingSeatSocket.controlledSeatUsername = undefined;
+    }
+
+    if (existingSeatArrayIndex !== -1 && existingSeatSocket !== controllerSocket) {
+      this.socketsOfPlayers.splice(existingSeatArrayIndex, 1);
+    }
+
+    const existingControllerSeatIndex = this.socketsOfPlayers.indexOf(controllerSocket);
+    if (existingControllerSeatIndex !== -1) {
+      this.socketsOfPlayers.splice(existingControllerSeatIndex, 1);
+    }
+
+    if (controllerSocket.isBotSocket === true) {
+      if (this.allSockets.indexOf(controllerSocket) === -1) {
+        this.allSockets.push(controllerSocket);
+      }
+      if (this.botSockets.indexOf(controllerSocket) === -1) {
+        this.botSockets.push(controllerSocket);
+      }
+    } else if (controllerType === 'spectator') {
+      controllerSocket.controlledSeatUsername = seatUsername;
+    } else {
+      controllerSocket.controlledSeatUsername = undefined;
+    }
+
+    const insertionIndex =
+      existingSeatArrayIndex !== -1 ? existingSeatArrayIndex : seatIndex;
+    this.socketsOfPlayers.splice(insertionIndex, 0, controllerSocket);
+  }
+
+  removeBotControllerIfPresent(socket: SocketUser | undefined): void {
+    if (!socket || socket.isBotSocket !== true) {
+      return;
+    }
+
+    this.botSockets = this.botSockets.filter((candidate) => candidate !== socket);
+    this.allSockets = this.allSockets.filter((candidate) => candidate !== socket);
   }
 
   getStandaloneBotSockets() {
@@ -367,163 +537,200 @@ class Game extends Room {
   }
 
   takeOverSeatWithBot(targetUsername: string, requestedByUsername: string) {
-    if (!targetUsername) {
-      return {
-        success: false,
-        message: 'Please specify a player to hand over to a bot.',
-      };
-    }
-
-    targetUsername = this.anonymizer.deAnon(targetUsername);
-
-    const normalizedTargetUsername = targetUsername.toLowerCase();
-    const playerInGame = this.playersInGame.find(
-      (player) =>
-        player &&
-        player.username &&
-        player.username.toLowerCase() === normalizedTargetUsername,
-    );
-    const seatSocket = this.getSeatSocketByUsername(targetUsername);
-
-    const targetRequestUser =
-      this.getPlayerRequestUserByUsername(targetUsername) ||
-      (seatSocket && seatSocket.request ? seatSocket.request.user : undefined);
-
-    if (!targetRequestUser) {
-      return {
-        success: false,
-        message: `Could not find player ${targetUsername} in this room.`,
-      };
-    }
-
-    if (this.isBotControlledUsername(targetRequestUser.username)) {
-      return {
-        success: false,
-        message: `${targetRequestUser.username} is already bot-controlled.`,
-      };
-    }
-
-    if (seatSocket && seatSocket.isBotSocket === true) {
-      return {
-        success: false,
-        message: `${targetRequestUser.username} is already a standalone bot seat.`,
-      };
-    }
-
-    if (this.hasConnectedHumanSocket(targetRequestUser.username)) {
-      return {
-        success: false,
-        message: `${targetRequestUser.username} is still connected. Bot takeover is only available for absent players.`,
-      };
-    }
-
-    if (this.gameStarted === true && !playerInGame) {
-      return {
-        success: false,
-        message: `${targetRequestUser.username} is not seated in this running game.`,
-      };
-    }
-
-    if (this.gameStarted !== true && !seatSocket) {
-      return {
-        success: false,
-        message: `${targetRequestUser.username} is not seated in this room.`,
-      };
-    }
-
-    const botSocket = new SimpleBotSocket(targetRequestUser.username, {
-      requestUser: { ...targetRequestUser },
-      botSeatMode: 'takeover',
-      botProfileName: 'SimpleBot',
-      controlledHumanUsername: targetRequestUser.username,
+    return this.switchSeatController(targetUsername, {
+      controllerType: 'bot',
+      requestedByUsername,
     });
-
-    this.playerJoinRoom(botSocket, '');
-    if (this.gameStarted !== true) {
-      this.playerSitDown(botSocket);
-    }
-    this.botSockets.push(botSocket);
-    this.markBotControlledUsername(targetRequestUser.username, true);
-    this.removePendingHumanRestore(targetRequestUser.username);
-    this.flagBotUsage(requestedByUsername);
-
-    if (this.gameStarted === true) {
-      this.distributeGameData();
-      this.syncBotAutomation();
-    } else {
-      this.updateRoomPlayers();
-    }
-
-    return {
-      success: true,
-      message: `${requestedByUsername} assigned SimpleBot to ${targetRequestUser.username}'s seat.`,
-    };
   }
 
   restoreHumanSeat(targetUsername: string, requestedByUsername: string) {
+    return this.switchSeatController(targetUsername, {
+      controllerType: 'original',
+      requestedByUsername,
+    });
+  }
+
+  switchSeatController(
+    targetUsername: string,
+    {
+      controllerType,
+      controllerUsername,
+      requestedByUsername,
+    }: {
+      controllerType: 'bot' | 'original' | 'spectator';
+      controllerUsername?: string;
+      requestedByUsername: string;
+    },
+  ) {
     if (!targetUsername) {
       return {
         success: false,
-        message: 'Please specify a player to restore.',
+        message: 'Please specify a seat to switch.',
+      };
+    }
+
+    if (this.gameStarted !== true) {
+      return {
+        success: false,
+        message: 'Seat controller switching is only available during a running game.',
       };
     }
 
     targetUsername = this.anonymizer.deAnon(targetUsername);
-
-    const seatSocket = this.getSeatSocketByUsername(targetUsername);
-    if (
-      !seatSocket ||
-      seatSocket.isBotSocket !== true ||
-      seatSocket.botSeatMode !== 'takeover'
-    ) {
-      return {
-        success: false,
-        message: `${targetUsername} is not currently bot-controlled.`,
-      };
-    }
-
-    const humanSocket = this.findConnectedHumanSocket(targetUsername);
-    if (!humanSocket) {
-      return {
-        success: false,
-        message: `${targetUsername} must be back in the room before you can restore them.`,
-      };
-    }
-
-    const seatIndex = this.findSeatIndexByUsername(targetUsername);
-    if (seatIndex === -1) {
-      return {
-        success: false,
-        message: `Could not find ${targetUsername}'s seat to restore.`,
-      };
-    }
-
-    this.socketsOfPlayers[seatIndex] = humanSocket;
-    this.botSockets = this.botSockets.filter((socket) => socket !== seatSocket);
-    this.allSockets = this.allSockets.filter((socket) => socket !== seatSocket);
-    this.markBotControlledUsername(targetUsername, false);
-    this.removePendingHumanRestore(targetUsername);
-
-    const playerInGame = this.playersInGame.find(
+    const seatIndex = this.playersInGame.findIndex(
       (player) =>
         player &&
         player.username &&
         player.username.toLowerCase() === targetUsername.toLowerCase(),
     );
-    if (playerInGame) {
-      playerInGame.request = humanSocket.request;
+    if (seatIndex === -1) {
+      return {
+        success: false,
+        message: `Could not find player ${targetUsername} in this running game.`,
+      };
     }
 
-    if (this.gameStarted === true) {
-      this.distributeGameData();
-      this.syncBotAutomation();
-    } else {
-      this.updateRoomPlayers();
+    const seatUsername = this.playersInGame[seatIndex].username;
+    const currentSeatSocket = this.getSeatSocketByUsername(seatUsername);
+    const currentSummary = this.getSeatControllerSummary(seatUsername);
+
+    if (controllerType === 'spectator' && !controllerUsername) {
+      return {
+        success: false,
+        message: 'Please specify which connected spectator should control that seat.',
+      };
     }
+
+    if (
+      controllerType === 'spectator' &&
+      controllerUsername &&
+      controllerUsername.toLowerCase() === seatUsername.toLowerCase()
+    ) {
+      controllerType = 'original';
+      controllerUsername = undefined;
+    }
+
+    if (
+      currentSummary.controllerType === controllerType &&
+      (!controllerUsername ||
+        currentSummary.controllerUsername?.toLowerCase() ===
+          controllerUsername.toLowerCase())
+    ) {
+      return {
+        success: false,
+        message: `${seatUsername} is already using that controller.`,
+      };
+    }
+
+    let nextControllerSocket;
+    let nextControllerLabel;
+
+    if (controllerType === 'bot') {
+      const targetRequestUser = this.getPlayerRequestUserByUsername(seatUsername);
+      nextControllerSocket = new SimpleBotSocket(seatUsername, {
+        requestUser: { ...targetRequestUser },
+        botSeatMode: 'takeover',
+        botProfileName: 'SimpleBot',
+        controlledHumanUsername: seatUsername,
+      });
+      nextControllerLabel = 'SimpleBot';
+    } else if (controllerType === 'original') {
+      nextControllerSocket = this.findConnectedHumanSocket(seatUsername);
+      if (!nextControllerSocket) {
+        return {
+          success: false,
+          message: `${seatUsername} must be connected before you can switch that seat back to the original player.`,
+        };
+      }
+      nextControllerLabel = seatUsername;
+    } else {
+      nextControllerSocket = this.getControllerSocketByUsername(controllerUsername);
+      if (!nextControllerSocket) {
+        return {
+          success: false,
+          message: `${controllerUsername} must be connected as a spectator before they can control that seat.`,
+        };
+      }
+      nextControllerLabel = nextControllerSocket.request.user.username;
+    }
+
+    const otherSeatIndex = this.socketsOfPlayers.findIndex(
+      (socket) =>
+        socket === nextControllerSocket &&
+        this.getEffectiveSeatUsername(socket)?.toLowerCase() !==
+          seatUsername.toLowerCase(),
+    );
+    if (otherSeatIndex !== -1) {
+      return {
+        success: false,
+        message: `${nextControllerLabel} is already controlling another seat.`,
+      };
+    }
+
+    this.attachControllerToSeat(
+      seatIndex,
+      seatUsername,
+      nextControllerSocket,
+      controllerType,
+    );
+
+    if (currentSeatSocket && currentSeatSocket !== nextControllerSocket) {
+      this.removeBotControllerIfPresent(currentSeatSocket);
+    }
+
+    if (controllerType === 'bot') {
+      this.markBotControlledUsername(seatUsername, true);
+      this.flagBotUsage(requestedByUsername);
+      this.flagSeatSwitchUsage(requestedByUsername);
+      this.setSeatControllerState(seatUsername, 'bot', nextControllerLabel);
+      this.recordSeatControllerChange(
+        seatUsername,
+        'bot',
+        requestedByUsername,
+        nextControllerLabel,
+      );
+    } else if (controllerType === 'spectator') {
+      this.markBotControlledUsername(seatUsername, false);
+      this.flagSeatSwitchUsage(requestedByUsername);
+      this.setSeatControllerState(
+        seatUsername,
+        'spectator',
+        nextControllerSocket.request.user.username,
+      );
+      this.recordSeatControllerChange(
+        seatUsername,
+        'spectator',
+        requestedByUsername,
+        nextControllerSocket.request.user.username,
+      );
+    } else {
+      this.markBotControlledUsername(seatUsername, false);
+      this.setSeatControllerState(seatUsername, 'original');
+      this.recordSeatControllerChange(
+        seatUsername,
+        'original',
+        requestedByUsername,
+      );
+      if (this.playersInGame[seatIndex]) {
+        this.playersInGame[seatIndex].request = nextControllerSocket.request;
+      }
+    }
+
+    this.refreshPendingHumanRestoreForSeat(seatUsername);
+    this.distributeGameData();
+    this.syncBotAutomation();
+
+    const displayedSeatName = this.anonymizer.anon(seatUsername);
 
     return {
       success: true,
-      message: `${requestedByUsername} restored ${targetUsername} to human control.`,
+      message: `${requestedByUsername} switched ${displayedSeatName}'s seat to ${
+        controllerType === 'original'
+          ? 'the original player'
+          : controllerType === 'bot'
+            ? 'SimpleBot'
+            : nextControllerSocket.request.user.username
+      }.`,
     };
   }
 
@@ -603,11 +810,19 @@ class Game extends Room {
 
     if (this.gameStarted === true) {
       this.socketsOfPlayers = this.playersInGame.map((player) => {
-        const botSocket = this.botSockets.find(
-          (socket) =>
-            socket.request.user.username.toLowerCase() ===
-            player.username.toLowerCase(),
-        );
+        const seatControllerState =
+          this.getSeatControllerState(player.username) || {
+            controllerType: 'original',
+          };
+        const botSocket =
+          seatControllerState.controllerType === 'bot'
+            ? this.botSockets.find(
+                (socket) =>
+                  socket.request.user.username.toLowerCase() ===
+                  player.username.toLowerCase(),
+              )
+            : undefined;
+
         if (botSocket) {
           return botSocket;
         }
@@ -635,7 +850,7 @@ class Game extends Room {
   playerJoinRoom(socket, inputPassword) {
     if (
       socket.isBotSocket !== true &&
-      this.isBotControlledUsername(socket.request.user.username)
+      this.isSeatSubstitutedUsername(socket.request.user.username)
     ) {
       return Room.prototype.playerJoinRoom.call(this, socket, inputPassword);
     }
@@ -854,6 +1069,24 @@ class Game extends Room {
     }
 
     this.anonymizer.initialise(this.playerUsernamesInGame, this.anonymousMode);
+
+    this.seatControllerStates = {};
+    for (let i = 0; i < this.playersInGame.length; i++) {
+      const seatUsername = this.playersInGame[i].username;
+      if (
+        this.socketsOfPlayers[i] &&
+        this.socketsOfPlayers[i].isBotSocket === true
+      ) {
+        this.setSeatControllerState(
+          seatUsername,
+          'bot',
+          this.socketsOfPlayers[i].botProfileName ||
+            this.socketsOfPlayers[i].request.user.username,
+        );
+      } else {
+        this.setSeatControllerState(seatUsername, 'original');
+      }
+    }
 
     // Give roles to the players according to their alliances
     // Get roles:
@@ -1404,11 +1637,18 @@ class Game extends Room {
         const isClaiming = this.claimingPlayers.has(
           this.playersInGame[i].request.user.username,
         );
+        const seatUsername = this.playersInGame[i].username;
+        const controllerSummary = this.getSeatControllerSummary(seatUsername);
+        const seatSocket = this.getSeatSocketByUsername(seatUsername);
+        const standaloneBot =
+          seatSocket &&
+          seatSocket.isBotSocket === true &&
+          seatSocket.botSeatMode === 'standalone';
 
         roomPlayers[i] = {
-          username: this.anonymizer.anon(this.playersInGame[i].username),
+          username: this.anonymizer.anon(seatUsername),
           anonUsername: this.anonymizer.anon(
-            this.playersInGame[i].username,
+            seatUsername,
             false,
           ),
 
@@ -1422,21 +1662,17 @@ class Game extends Room {
             ? null
             : this.playersInGame[i].request.user.avatarHide,
           claim: isClaiming,
-          disconnected:
-            playersInRoom.includes(this.playersInGame[i].username.toLowerCase()) ===
-              false &&
-            this.isBotControlledUsername(this.playersInGame[i].username) ===
-              false,
-          isBot:
-            this.playersInGame[i].request.user.bot === true &&
-            this.isBotControlledUsername(this.playersInGame[i].username) ===
-              false,
-          botControlled: this.isBotControlledUsername(
-            this.playersInGame[i].username,
-          ),
-          awaitingHumanRestore: this.isAwaitingHumanRestore(
-            this.playersInGame[i].username,
-          ),
+          disconnected: playersInRoom.includes(seatUsername.toLowerCase()) === false,
+          isBot: standaloneBot === true,
+          botControlled:
+            controllerSummary.controllerType === 'bot' && standaloneBot !== true,
+          awaitingHumanRestore: this.isAwaitingHumanRestore(seatUsername),
+          controllerType: controllerSummary.controllerType,
+          controllerUsername:
+            controllerSummary.controllerType === 'original'
+              ? undefined
+              : controllerSummary.controllerUsername,
+          originalPlayerConnected: controllerSummary.originalPlayerConnected,
         };
 
         // give the host the teamLeader star
@@ -1457,16 +1693,12 @@ class Game extends Room {
     if (this.gameStarted === true) {
       const gameData = this.getGameData();
       for (let i = 0; i < this.playersInGame.length; i++) {
-        const index = usernamesIndexes.getIndexFromUsername(
-          this.socketsOfPlayers,
+        const seatSocket = this.getSeatSocketByUsername(
           this.playersInGame[i].username,
         );
         // need to go through all sockets, but only send to the socket of players in game
-        if (
-          this.socketsOfPlayers[index] &&
-          typeof this.socketsOfPlayers[index].emit === 'function'
-        ) {
-          this.socketsOfPlayers[index].emit('game-data', gameData[i]);
+        if (seatSocket && typeof seatSocket.emit === 'function') {
+          seatSocket.emit('game-data', gameData[i]);
           // console.log("Sent to player: " + this.playersInGame[i].request.user.username + " role " + gameData[i].role);
         }
       }
@@ -1858,6 +2090,8 @@ class Game extends Room {
       botUsernames,
       botControlledSeats,
       botUsed: this.botUsed === true,
+      seatSwitchUsed: this.seatSwitchUsed === true,
+      seatControlHistory: this.seatControlHistory || [],
 
       playerUsernamesOrdered: getUsernamesOfPlayersInGame(this),
       playerUsernamesOrderedReversed: gameReverseArray(
@@ -1938,7 +2172,7 @@ class Game extends Room {
         });
       });
 
-    if (this.botUsed !== true) {
+    if (this.botUsed !== true && this.seatSwitchUsed !== true) {
       // Check if the game contains any provisional players.
       let provisionalGame = false;
       if (
@@ -2432,8 +2666,11 @@ class Game extends Room {
   }
 
   votePauseTimeout(socket: SocketUser, leaveTriggered: boolean): void {
+    const seatUsername =
+      this.getSeatUsernameForSocket(socket) || socket.request.user.username;
+
     // Verify they are in the game.
-    if (!this.usernameIsPlayer(socket.request.user.username)) {
+    if (!this.usernameIsPlayer(seatUsername)) {
       if (!leaveTriggered) {
         sendReplyToCommand(socket, 'You are not a player in this game.');
       }
@@ -2473,7 +2710,7 @@ class Game extends Room {
 
     if (
       this.gameTimer.votePauseTimeout(
-        socket.request.user.username,
+        seatUsername,
         leaveTriggered,
       )
     ) {
@@ -2486,8 +2723,11 @@ class Game extends Room {
   }
 
   voteUnpauseTimeout(socket: SocketUser): void {
+    const seatUsername =
+      this.getSeatUsernameForSocket(socket) || socket.request.user.username;
+
     // Verify they are in the game.
-    if (!this.usernameIsPlayer(socket.request.user.username)) {
+    if (!this.usernameIsPlayer(seatUsername)) {
       sendReplyToCommand(socket, 'You are not a player in this game.');
       return;
     }
@@ -2557,8 +2797,11 @@ class Game extends Room {
   }
 
   voteVoidGame(socket: SocketUser): void {
+    const seatUsername =
+      this.getSeatUsernameForSocket(socket) || socket.request.user.username;
+
     // Verify they are in the game.
-    if (!this.usernameIsPlayer(socket.request.user.username)) {
+    if (!this.usernameIsPlayer(seatUsername)) {
       socket.emit('messageCommandReturnStr', {
         message: 'You are not a player in this game.',
         classStr: 'server-text',
@@ -2582,7 +2825,7 @@ class Game extends Room {
       return;
     }
 
-    if (this.voidGameTracker.playerVoted(socket.request.user.username)) {
+    if (this.voidGameTracker.playerVoted(seatUsername)) {
       gamesPlayedMetric.inc(1, { status: 'voided' });
 
       this.changePhase(Phase.Voided);
@@ -2599,9 +2842,9 @@ class Game extends Room {
     }
 
     if (this.muteSpectators) {
-      const playerUsernamesLower: string[] = this.playersInGame.map(
-        (player: any) => player.username.toLowerCase(),
-      );
+      const playerUsernamesLower: string[] = this.socketsOfPlayers
+        .filter((socket: any) => socket && typeof socket.emit === 'function')
+        .map((socket: any) => socket.request.user.username.toLowerCase());
 
       return (
         playerUsernamesLower.includes(usernameLower) ||
@@ -2880,7 +3123,15 @@ function getUsernamesOfPlayersInRoom(thisRoom) {
   if (thisRoom.gameStarted === true) {
     const array = [];
     for (let i = 0; i < thisRoom.socketsOfPlayers.length; i++) {
-      array.push(thisRoom.socketsOfPlayers[i].request.user.username);
+      const seatUsername = thisRoom.getEffectiveSeatUsername(
+        thisRoom.socketsOfPlayers[i],
+      );
+      if (
+        seatUsername &&
+        typeof thisRoom.socketsOfPlayers[i].emit === 'function'
+      ) {
+        array.push(seatUsername);
+      }
     }
     return array;
   }

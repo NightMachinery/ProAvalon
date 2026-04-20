@@ -92,4 +92,7 @@ export type RoomPlayer = {
   isBot?: boolean;
   botControlled?: boolean;
   awaitingHumanRestore?: boolean;
+  controllerType?: 'original' | 'bot' | 'spectator';
+  controllerUsername?: string;
+  originalPlayerConnected?: boolean;
 };

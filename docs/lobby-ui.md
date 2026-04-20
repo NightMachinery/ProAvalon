@@ -70,11 +70,12 @@ The previous absolute-position hacks for the room bars are removed from the main
 - existing gameplay, chat, claim, vote, and restart flows
 - host-only **Bots** modal for:
   - adding standalone SimpleBots before game start
-  - assigning SimpleBot to an absent player seat
-  - restoring a reconnected player from bot control
+  - showing a per-seat switch icon that opens a dropdown of controller choices
+  - switching a live seat between SimpleBot, the original player, and connected spectators
 - room player badges for:
   - standalone bot seats
   - bot-controlled seats
+  - spectator-controlled seats
   - seats waiting for human restore
 
 ## Deferred work
