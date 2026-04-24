@@ -47,8 +47,27 @@ USAGE
 }
 
 tmuxnew () {
-	tmux kill-session -t "$1" &> /dev/null || true
-	tmux new -d -s "$@"
+  local session="$1"
+  shift
+
+  tmux kill-session -t "$session" &>/dev/null || true
+  tmux new-session -d -s "$session" "$@"
+}
+
+tmuxnew_with_env() {
+  local session="$1"
+  shift
+  local command="$1"
+  shift
+  local -a tmux_args=(-d -s "$session")
+  local env_assignment
+
+  for env_assignment in "$@"; do
+    tmux_args+=(-e "$env_assignment")
+  done
+
+  tmux kill-session -t "$session" &>/dev/null || true
+  tmux new-session "${tmux_args[@]}" "$command"
 }
 
 die() {
@@ -555,10 +574,17 @@ start_infra() {
 start_app() {
   [[ -f "$ROOT_DIR/out/app.js" ]] || die 'Missing build output out/app.js. Run setup or redeploy first.'
   note 'Starting ProAvalon app'
-  local proxy_exports
-  proxy_exports="$(build_proxy_exports)"
-  local cmd="set -euo pipefail; ${proxy_exports:+$proxy_exports; }exec ${(q)RUN_APP_SCRIPT}"
-  tmuxnew "$APP_SESSION" zsh -lc "$cmd"
+  local var value
+  local -a env_assignments=()
+
+  for var in "${proxy_vars[@]}"; do
+    if (( ${+parameters[$var]} )); then
+      value="${(P)var}"
+      env_assignments+=("$var=$value")
+    fi
+  done
+
+  tmuxnew_with_env "$APP_SESSION" "zsh -lc 'exec ${(q)RUN_APP_SCRIPT}'" "${env_assignments[@]}"
   wait_for_tcp 127.0.0.1 "$APP_PORT" 'ProAvalon app' "$APP_SESSION" "$APP_LOG"
 }
 

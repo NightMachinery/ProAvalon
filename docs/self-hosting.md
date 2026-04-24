@@ -36,6 +36,7 @@ If you need a proxy for package downloads, export the usual proxy vars before ru
 
 Proxy note:
 - the app/pnpm steps inherit your current proxy env vars
+- tmux-managed app startup now receives those proxy values as literal environment entries, so `NO_PROXY` values such as `127.0.0.1,localhost,::1` do not break shell quoting
 - Docker does **not** inherit those proxy env vars from the script; Docker is run with proxy vars unset so it can use the host's own daemon/mirror configuration (for example `/etc/docker/daemon.json`)
 - for Docker Hub images, the self-host script also resolves the image reference through the first configured registry mirror from `/etc/docker/daemon.json` (or `SELF_HOST_REGISTRY_MIRROR` if set)
 
