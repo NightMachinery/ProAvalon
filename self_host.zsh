@@ -653,6 +653,7 @@ redeploy_cmd() {
 
 start_cmd() {
   load_config
+  stop_services
   write_docker_compose_file
   write_app_env_file
   write_run_app_script

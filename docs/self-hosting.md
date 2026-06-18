@@ -79,7 +79,7 @@ Example:
 Rebuilds from the latest local working tree and restarts everything using the saved config.
 
 ### `start`
-Starts the saved self-host configuration without rebuilding.
+Restarts the saved self-host configuration without rebuilding. If the managed self-host stack is already running, `start` stops it first and then starts it again.
 
 ### `stop`
 Stops the tmux sessions and brings down the Docker Compose infra.
